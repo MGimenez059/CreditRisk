@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: creditrisk
+      POSTGRES_PASSWORD: creditrisk
+      POSTGRES_DB: creditrisk
+    ports:
+      - "5432:5432"
+    volumes:
+      - creditrisk_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U creditrisk -d creditrisk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["alembic", "upgrade", "head"]
+
+  api:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./models:/app/models:ro
+
+volumes:
+  creditrisk_db_data:
