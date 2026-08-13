@@ -1,0 +1,45 @@
+# --- Environments & secrets -------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# --- Tooling caches ------------------------------------------------------------
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# --- Data & models (see docs/data_dictionary.md for provenance) -----------------
+data/raw/*
+!data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+models/*.joblib
+models/*.json
+!models/.gitkeep
+
+# --- Notebooks checkpoints ---------------------------------------------------
+.ipynb_checkpoints/
+
+# --- IDE -----------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+
+# --- OS --------------------------------------------------------------------
+.DS_Store
+Thumbs.db

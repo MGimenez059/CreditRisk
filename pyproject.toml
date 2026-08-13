@@ -1,0 +1,128 @@
+[project]
+name = "credit-risk"
+version = "0.1.0"
+description = "End-to-end machine learning system for estimating the probability of loan default."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "polars>=1.12",
+    "pandas>=2.2",
+    "numpy>=2.1",
+    "pyarrow>=17.0",
+    "duckdb>=1.1",
+    "xgboost>=2.1",
+    "scikit-learn>=1.5",
+    "shap>=0.46",
+    "optuna>=4.0",
+    "joblib>=1.4",
+    "structlog>=24.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "pre-commit>=4.0",
+    "pandas-stubs>=2.2",
+]
+viz = [
+    "plotly>=5.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/credit_risk"]
+
+# ---------------------------------------------------------------------------
+# Ruff — formatter + linter. Authoritative per CODESTYLE.md §5 and §18.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+# Ruff formats embedded Python fences in Markdown by default; documentation
+# files here are prose with illustrative code snippets, not linted sources.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+    "C90",  # mccabe complexity
+    "ANN",  # flake8-annotations (mandatory type hints, CODESTYLE §5)
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib (CODESTYLE §5: prefer pathlib over os.path)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ANN201", "ANN001", "ARG001", "ARG002"]
+"alembic/**/*.py" = ["ANN201", "ARG001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["credit_risk"]
+
+# ---------------------------------------------------------------------------
+# MyPy — strict mode, CODESTYLE.md §6.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+no_implicit_reexport = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/"]
+
+[[tool.mypy.overrides]]
+# sklearn/joblib lack type stubs; shap/xgboost/optuna/duckdb aren't imported
+# yet (roadmap Phases 3-5) but are pre-declared here for when they are.
+module = ["sklearn.*", "joblib.*", "shap.*", "xgboost.*", "optuna.*", "duckdb.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Pytest — CODESTYLE.md §11.
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast, no I/O tests",
+    "integration: tests requiring a database or external services",
+]
+
+[tool.coverage.run]
+source = ["src/credit_risk"]
+omit = ["*/db/models/*", "*/__init__.py"]
