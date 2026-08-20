@@ -51,20 +51,20 @@ CreditRisk predicts the probability that a borrower will default on a loan, and 
 
 ```text
                     ┌────────────────────┐
-                    │   Public Dataset    │
-                    │   CSV / Parquet     │
+                    │   Public Dataset   │
+                    │   CSV / Parquet    │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │ Data Validation     │
-                    │ + Profiling         │
+                    │ Data Validation    │
+                    │ + Profiling        │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │ Feature Engineering │
-                    │ + Preprocessing     │
+                    │Feature Engineering │
+                    │ + Preprocessing    │
                     └─────────┬──────────┘
                               │
                     ┌─────────┴─────────┐
@@ -77,14 +77,14 @@ CreditRisk predicts the probability that a borrower will default on a loan, and 
                    └──────────┬──────────┘
                               ▼
                     ┌────────────────────┐
-                    │ Model Artifact      │
-                    │ + Metadata          │
+                    │  Model Artifact    │
+                    │   + Metadata       │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │ FastAPI             │
-                    │ Prediction Service  │
+                    │     FastAPI        │
+                    │ Prediction Service │
                     └───────┬───────┬────┘
                             │       │
                  ┌──────────┘       └──────────┐
