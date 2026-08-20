@@ -2,7 +2,7 @@
 
 **An end-to-end machine learning system for estimating the probability of loan default.**
 
-CreditRisk is a portfolio-grade Data Science / ML Engineering / Backend project. It goes from raw tabular data to a served, explainable, containerized prediction API — not just a notebook with a model in it.
+CreditRisk is a portfolio-grade Data Science / ML Engineering / Backend project. It goes from raw tabular data to a served, explainable, containerized prediction API.
 
 > ⚠️ **Educational / portfolio project.** This system uses public, anonymized data and synthetic examples. It does **not** connect to any real financial institution, does not process real PII, and must not be used to make real lending decisions. See [Ethical Considerations](#ethical-considerations).
 
