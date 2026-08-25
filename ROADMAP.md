@@ -5,19 +5,19 @@
 ---
 
 ## Phase 0 — Planning
-- [ ] Define MVP scope and non-goals (no real PII, no automated loan approval)
-- [ ] Select a public credit risk dataset (Kaggle / UCI / OpenML / LendingClub-derived)
-- [ ] Document dataset provenance (source, version, license, URL, record count, target)
-- [ ] Define the binary target `loan_status` (0 = no default, 1 = default) and verify the real mapping
-- [ ] Define initial features (see suggested schema: age, income, employment, amount, rate, credit history, etc.)
+- [x] Define MVP scope and non-goals (no real PII, no automated loan approval)
+- [x] Select a public credit risk dataset (Kaggle / UCI / OpenML / LendingClub-derived)
+- [x] Document dataset provenance (source, version, license, URL, record count, target)
+- [x] Define the binary target `loan_status` (0 = no default, 1 = default) and verify the real mapping
+- [x] Define initial features (see suggested schema: age, income, employment, amount, rate, credit history, etc.)
 
 ## Phase 1 — Repository
-- [ ] Initialize a Python 3.12+ project with `pyproject.toml`
-- [ ] Create the `src/credit_risk/` package structure (api, config, db, schemas, repositories, services, ml)
-- [ ] Configure Ruff, MyPy, and pre-commit
-- [ ] Configure Pytest
-- [ ] Configure environment variables (`.env.example`)
-- [ ] Write the initial README
+- [x] Initialize a Python 3.12+ project with `pyproject.toml`
+- [x] Create the `src/credit_risk/` package structure (api, config, db, schemas, repositories, services, ml)
+- [x] Configure Ruff, MyPy, and pre-commit
+- [x] Configure Pytest
+- [x] Configure environment variables (`.env.example`)
+- [x] Write the initial README
 
 ## Phase 2 — Data
 - [ ] Download and store the dataset (evaluate whether to commit it based on license/size) — pending: needs a real download from Kaggle, not runnable from an unattended environment; see `scripts/ingest_data.py`'s module docstring
