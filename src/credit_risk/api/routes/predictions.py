@@ -8,7 +8,6 @@ from credit_risk.api.dependencies import get_prediction_service
 from credit_risk.config.settings import Settings, get_settings
 from credit_risk.exceptions import BatchSizeExceededError
 from credit_risk.schemas.prediction import (
-    BatchPredictionRequest,
     BatchPredictionResponse,
     FeatureContribution,
     ModelInfo,
@@ -55,21 +54,25 @@ async def create_prediction(
 
 @router.post("/batch", response_model=BatchPredictionResponse)
 async def create_batch_prediction(
-    payload: BatchPredictionRequest,
+    payload: list[PredictionRequest],
     prediction_service: Annotated[PredictionService, Depends(get_prediction_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> BatchPredictionResponse:
     """Predict default probability for a batch of loan applications.
 
+    The request body is a bare JSON array, per SPECS.md's Batch prediction
+    section ("Input: JSON array initially") — not an object wrapping the
+    array in a named field.
+
     Raises:
-        BatchSizeExceededError: If `payload.items` exceeds `MAX_BATCH_SIZE`.
+        BatchSizeExceededError: If `payload` exceeds `MAX_BATCH_SIZE`.
             Translated to `HTTP 422` by the centralized exception handler.
         ModelNotFoundError: If no trained model artifact exists yet.
     """
-    if len(payload.items) > settings.max_batch_size:
+    if len(payload) > settings.max_batch_size:
         raise BatchSizeExceededError(
-            f"Batch size {len(payload.items)} exceeds the maximum of {settings.max_batch_size}."
+            f"Batch size {len(payload)} exceeds the maximum of {settings.max_batch_size}."
         )
 
-    results = [prediction_service.predict(item) for item in payload.items]
+    results = [prediction_service.predict(item) for item in payload]
     return BatchPredictionResponse(results=[_to_response(result) for result in results])

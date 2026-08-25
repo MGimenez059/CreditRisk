@@ -2,7 +2,7 @@
 
 **An end-to-end machine learning system for estimating the probability of loan default.**
 
-CreditRisk is a portfolio-grade Data Science / ML Engineering / Backend project. It goes from raw tabular data to a served, explainable, containerized prediction API.
+CreditRisk is a portfolio-grade Data Science / ML Engineering / Backend project. It goes from raw tabular data to a served, explainable, containerized prediction API — not just a notebook with a model in it.
 
 > ⚠️ **Educational / portfolio project.** This system uses public, anonymized data and synthetic examples. It does **not** connect to any real financial institution, does not process real PII, and must not be used to make real lending decisions. See [Ethical Considerations](#ethical-considerations).
 
@@ -51,20 +51,20 @@ CreditRisk predicts the probability that a borrower will default on a loan, and 
 
 ```text
                     ┌────────────────────┐
-                    │   Public Dataset   │
-                    │   CSV / Parquet    │
+                    │   Public Dataset    │
+                    │   CSV / Parquet     │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │ Data Validation    │
-                    │ + Profiling        │
+                    │ Data Validation     │
+                    │ + Profiling         │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │Feature Engineering │
-                    │ + Preprocessing    │
+                    │ Feature Engineering │
+                    │ + Preprocessing     │
                     └─────────┬──────────┘
                               │
                     ┌─────────┴─────────┐
@@ -77,14 +77,14 @@ CreditRisk predicts the probability that a borrower will default on a loan, and 
                    └──────────┬──────────┘
                               ▼
                     ┌────────────────────┐
-                    │  Model Artifact    │
-                    │   + Metadata       │
+                    │ Model Artifact      │
+                    │ + Metadata          │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │     FastAPI        │
-                    │ Prediction Service │
+                    │ FastAPI             │
+                    │ Prediction Service  │
                     └───────┬───────┬────┘
                             │       │
                  ┌──────────┘       └──────────┐
@@ -365,7 +365,7 @@ Global feature importance and summary plots are available in `notebooks/03_model
 ```bash
 pytest
 ruff check .
-mypy src
+mypy src scripts
 ```
 
 - **Unit tests** — feature engineering, validation, risk scoring, preprocessing, prediction service, repositories

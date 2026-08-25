@@ -65,13 +65,15 @@ class PredictionResponse(BaseModel):
     explanation: list[FeatureContribution]
 
 
-class BatchPredictionRequest(BaseModel):
-    """A batch of loan applications submitted for prediction in one call."""
-
-    items: list[PredictionRequest]
-
-
 class BatchPredictionResponse(BaseModel):
-    """Results for a batch prediction request, one entry per input item."""
+    """Results for a batch prediction request, one entry per input item.
+
+    The request body itself is a bare `list[PredictionRequest]` — see
+    `api/routes/predictions.create_batch_prediction` — per SPECS.md's Batch
+    prediction section ("Input: JSON array initially"). The response stays
+    wrapped in a named field rather than mirroring that as a bare array,
+    since an unconstrained response shape is free to grow (e.g. pagination
+    metadata) without a breaking change later.
+    """
 
     results: list[PredictionResponse]
