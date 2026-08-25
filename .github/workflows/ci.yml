@@ -50,7 +50,7 @@ jobs:
         run: ruff check .
 
       - name: MyPy strict type check
-        run: mypy src
+        run: mypy src scripts
 
       - name: Run tests with coverage
         run: pytest --cov --cov-report=term-missing

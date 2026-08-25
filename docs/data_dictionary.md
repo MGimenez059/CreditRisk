@@ -8,10 +8,20 @@
 | **Records** | 32,581 rows |
 | **Columns** | 12 (11 features + 1 target) |
 | **Target** | `loan_status` (0 = no default, 1 = default) |
-| **License** | Not machine-readable on the Kaggle listing at the time of writing — confirm the current license on the dataset page before redistributing the raw file. The raw CSV is **not** committed to this repository (see `.gitignore`); `scripts/ingest_data.py` downloads or expects a manually placed local copy. |
+| **License** | Not machine-readable on the Kaggle listing at the time of writing — confirm the current license on the dataset page before redistributing the raw file. The raw CSV is **not** committed to this repository (see `.gitignore`). |
 | **Dataset version** | Pinned per training run in `ModelArtifactMetadata.dataset_version` (see `docs/architecture.md`), not hardcoded here, so this document does not go stale when the source dataset is updated upstream. |
 
 This is a synthetic/anonymized public dataset used for portfolio and educational purposes. It does not represent real applicants — see [Ethical Considerations](../README.md#ethical-considerations) in the README.
+
+## Getting the raw file
+
+Kaggle requires an authenticated account to download datasets, and this project has no Kaggle client in its dependencies (see `README.md`'s Tech Stack table), so `scripts/ingest_data.py` does not auto-download anything. Steps:
+
+1. Download the CSV from the [dataset page](https://www.kaggle.com/datasets/laotse/credit-risk-dataset) (Kaggle account required).
+2. Save it as `data/raw/credit_risk_dataset.csv` — this exact path is what `scripts/ingest_data.py` expects.
+3. Run `python scripts/ingest_data.py`. It validates the file against the schema below (stopping immediately on any schema or value violation, per `SPECS.md §28`), writes `docs/data_quality_report.md`, and — only if validation passes — writes a cleaned copy to `data/interim/credit_risk_validated.parquet` for Phase 3.
+
+`docs/data_quality_report.md` is generated, not written by hand — it doesn't exist in this repo until step 3 has been run at least once, and per `SPECS.md §29` it isn't necessarily re-committed on every single run.
 
 ## Raw source columns
 

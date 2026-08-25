@@ -116,7 +116,7 @@ ignore_missing_imports = true
 minversion = "8.0"
 addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 asyncio_mode = "auto"
 markers = [
     "unit: fast, no I/O tests",
@@ -124,5 +124,5 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/credit_risk"]
+source = ["src/credit_risk", "scripts"]
 omit = ["*/db/models/*", "*/__init__.py"]

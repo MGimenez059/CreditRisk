@@ -20,13 +20,13 @@
 - [ ] Write the initial README
 
 ## Phase 2 — Data
-- [ ] Download and store the dataset (evaluate whether to commit it based on license/size)
-- [ ] Implement the ingestion script (`scripts/ingest_data.py`)
-- [ ] Validate the dataset schema (types, ranges, nulls)
-- [ ] Generate a data quality report
-- [ ] Perform EDA (notebook `01_data_exploration.ipynb`)
-- [ ] Document the data dictionary (`docs/data_dictionary.md`)
-- [ ] Prevent data leakage (exclude post-outcome variables from the feature set)
+- [ ] Download and store the dataset (evaluate whether to commit it based on license/size) — pending: needs a real download from Kaggle, not runnable from an unattended environment; see `scripts/ingest_data.py`'s module docstring
+- [x] Implement the ingestion script (`scripts/ingest_data.py`)
+- [x] Validate the dataset schema (types, ranges, nulls)
+- [x] Generate a data quality report
+- [ ] Perform EDA (notebook `01_data_exploration.ipynb` is written and ready to run, but has not been executed against the real dataset yet — no outputs to review until Phase 2's data download step is done)
+- [x] Document the data dictionary (`docs/data_dictionary.md`)
+- [ ] Prevent data leakage (exclude post-outcome variables from the feature set) — `scripts/ingest_data.py` now *detects* likely leakage via correlation with the target as part of the quality report; actually excluding leaky columns from the trained feature set is a Phase 3 task once real feature engineering starts
 
 ## Phase 3 — ML Baseline
 - [ ] Create a train/validation/test split (stratified by target)
