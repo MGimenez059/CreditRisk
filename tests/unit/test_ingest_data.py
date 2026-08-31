@@ -16,15 +16,15 @@ import pytest
 
 from credit_risk.exceptions import DataValidationError
 from ingest_data import (
-    ValidationResult,
-    _raise_if_invalid,
+    CleaningResult,
+    _raise_if_schema_invalid,
+    _raise_if_too_many_excluded,
     compute_data_quality_report,
+    exclude_invalid_rows,
     load_raw_data,
     main,
     render_quality_report_markdown,
-    validate_dataset,
     validate_schema,
-    validate_values,
 )
 
 _VALID_ROWS = {
@@ -80,70 +80,83 @@ def test_validate_schema_flags_entirely_null_required_column() -> None:
     assert any("loan_int_rate" in issue and "entirely null" in issue for issue in issues)
 
 
-# --- validate_values -----------------------------------------------------
+def test_raise_if_schema_invalid_is_a_no_op_for_no_issues() -> None:
+    _raise_if_schema_invalid([])  # must not raise
 
 
-def test_validate_values_accepts_a_valid_frame() -> None:
-    assert validate_values(_valid_dataframe()) == []
+def test_raise_if_schema_invalid_raises_with_issues() -> None:
+    with pytest.raises(DataValidationError, match="bad schema"):
+        _raise_if_schema_invalid(["bad schema"])
 
 
-def test_validate_values_flags_negative_age() -> None:
+# --- exclude_invalid_rows -----------------------------------------------
+
+
+def test_exclude_invalid_rows_keeps_every_row_of_a_valid_frame() -> None:
+    result = exclude_invalid_rows(_valid_dataframe())
+
+    assert result.excluded_row_count == 0
+    assert len(result.cleaned) == 3
+
+
+def test_exclude_invalid_rows_drops_a_row_with_an_impossible_age() -> None:
     dataframe = _valid_dataframe()
-    dataframe.loc[0, "person_age"] = -5
+    dataframe.loc[0, "person_age"] = 144  # the real dataset's documented data-entry error
 
-    issues = validate_values(dataframe)
+    result = exclude_invalid_rows(dataframe)
 
-    assert any("person_age" in issue for issue in issues)
+    assert result.excluded_row_count == 1
+    assert len(result.cleaned) == 2
+    assert any("person_age" in reason for reason in result.exclusion_reasons)
 
 
-def test_validate_values_flags_unexpected_home_ownership_category() -> None:
+def test_exclude_invalid_rows_drops_a_row_with_an_invalid_category() -> None:
     dataframe = _valid_dataframe()
     dataframe.loc[0, "person_home_ownership"] = "CASTLE"
 
-    issues = validate_values(dataframe)
+    result = exclude_invalid_rows(dataframe)
 
-    assert any("person_home_ownership" in issue for issue in issues)
+    assert result.excluded_row_count == 1
+    assert any("person_home_ownership" in reason for reason in result.exclusion_reasons)
 
 
-def test_validate_values_flags_loan_status_outside_binary_range() -> None:
+def test_exclude_invalid_rows_combines_multiple_reasons_for_the_same_row() -> None:
     dataframe = _valid_dataframe()
-    dataframe.loc[0, "loan_status"] = 2
+    dataframe.loc[0, "person_age"] = -5
+    dataframe.loc[0, "person_home_ownership"] = "CASTLE"
 
-    issues = validate_values(dataframe)
+    result = exclude_invalid_rows(dataframe)
 
-    assert any("loan_status" in issue for issue in issues)
-
-
-# --- validate_dataset ------------------------------------------------------
-
-
-def test_validate_dataset_is_valid_for_clean_data() -> None:
-    result = validate_dataset(_valid_dataframe())
-
-    assert result.is_valid
+    assert result.excluded_row_count == 1
+    assert "person_age" in result.exclusion_reasons[0]
+    assert "person_home_ownership" in result.exclusion_reasons[0]
 
 
-def test_validate_dataset_skips_value_checks_when_schema_is_invalid() -> None:
-    dataframe = _valid_dataframe().drop(columns=["person_age"])
+def test_exclude_invalid_rows_resets_the_index_of_the_cleaned_frame() -> None:
+    dataframe = _valid_dataframe()
+    dataframe.loc[0, "person_age"] = -5
 
-    result = validate_dataset(dataframe)
+    result = exclude_invalid_rows(dataframe)
 
-    assert not result.is_valid
-    assert result.value_issues == []
-
-
-# --- _raise_if_invalid -------------------------------------------------
+    assert list(result.cleaned.index) == [0, 1]
 
 
-def test_raise_if_invalid_is_a_no_op_for_a_valid_result() -> None:
-    _raise_if_invalid(ValidationResult())  # must not raise
+# --- _raise_if_too_many_excluded ----------------------------------------
 
 
-def test_raise_if_invalid_raises_data_validation_error_listing_issues() -> None:
-    result = ValidationResult(schema_issues=["bad schema"], value_issues=["bad value"])
+def test_raise_if_too_many_excluded_is_a_no_op_within_the_threshold() -> None:
+    result = CleaningResult(cleaned=pd.DataFrame(), excluded_row_count=1)
 
-    with pytest.raises(DataValidationError, match="bad schema"):
-        _raise_if_invalid(result)
+    _raise_if_too_many_excluded(result, total_rows=1000)  # 0.1%, must not raise
+
+
+def test_raise_if_too_many_excluded_raises_beyond_the_threshold() -> None:
+    result = CleaningResult(
+        cleaned=pd.DataFrame(), excluded_row_count=10, exclusion_reasons=["Row 0: bad"]
+    )
+
+    with pytest.raises(DataValidationError, match="10 of 100 rows"):
+        _raise_if_too_many_excluded(result, total_rows=100)  # 10%, exceeds 5%
 
 
 # --- compute_data_quality_report / render_quality_report_markdown ----------
@@ -164,6 +177,22 @@ def test_quality_report_contains_required_fields(field_name: str) -> None:
     report = compute_data_quality_report(_valid_dataframe())
 
     assert field_name in report
+
+
+def test_quality_report_omits_excluded_rows_section_when_not_given_a_cleaning_result() -> None:
+    report = compute_data_quality_report(_valid_dataframe())
+
+    assert "excluded_rows" not in report
+
+
+def test_quality_report_includes_excluded_rows_section_when_given_a_cleaning_result() -> None:
+    cleaning_result = CleaningResult(
+        cleaned=_valid_dataframe(), excluded_row_count=2, exclusion_reasons=["Row 5: bad age"]
+    )
+
+    report = compute_data_quality_report(_valid_dataframe(), cleaning_result)
+
+    assert report["excluded_rows"] == {"count": 2, "reasons": ["Row 5: bad age"]}
 
 
 def test_quality_report_detects_a_duplicate_row() -> None:
@@ -192,6 +221,18 @@ def test_quality_report_renders_to_markdown() -> None:
     assert "Target distribution" in markdown
 
 
+def test_quality_report_markdown_lists_excluded_row_reasons() -> None:
+    cleaning_result = CleaningResult(
+        cleaned=_valid_dataframe(), excluded_row_count=1, exclusion_reasons=["Row 5: bad age"]
+    )
+    report = compute_data_quality_report(_valid_dataframe(), cleaning_result)
+
+    markdown = render_quality_report_markdown(report, source_path=Path("x.csv"))
+
+    assert "Excluded rows" in markdown
+    assert "Row 5: bad age" in markdown
+
+
 # --- load_raw_data (filesystem I/O via tmp_path, per test_registry.py's pattern) --
 
 
@@ -215,42 +256,63 @@ def test_load_raw_data_reads_a_valid_csv(tmp_path: Path) -> None:
 # --- main() end-to-end (filesystem I/O via tmp_path + monkeypatch) ---------
 
 
-def test_main_writes_report_and_interim_file_for_valid_data(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def _patch_paths(
+    monkeypatch: pytest.MonkeyPatch, raw_path: Path, interim_path: Path, report_path: Path
 ) -> None:
-    raw_path = tmp_path / "raw.csv"
-    interim_path = tmp_path / "interim.parquet"
-    report_path = tmp_path / "report.md"
-    _valid_dataframe().to_csv(raw_path, index=False)
-
     monkeypatch.setattr("ingest_data.RAW_DATA_PATH", raw_path)
     monkeypatch.setattr("ingest_data.INTERIM_DATA_PATH", interim_path)
     monkeypatch.setattr("ingest_data.QUALITY_REPORT_PATH", report_path)
 
-    exit_code = main()
 
-    assert exit_code == 0
+def test_main_writes_report_and_interim_file_for_valid_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw_path, interim_path, report_path = (
+        tmp_path / "raw.csv",
+        tmp_path / "interim.parquet",
+        tmp_path / "report.md",
+    )
+    _valid_dataframe().to_csv(raw_path, index=False)
+    _patch_paths(monkeypatch, raw_path, interim_path, report_path)
+
+    assert main() == 0
     assert interim_path.exists()
     assert report_path.exists()
 
 
-def test_main_stops_and_writes_nothing_for_invalid_data(
+def test_main_excludes_a_few_bad_rows_and_still_succeeds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    raw_path = tmp_path / "raw.csv"
-    interim_path = tmp_path / "interim.parquet"
-    report_path = tmp_path / "report.md"
+    raw_path, interim_path, report_path = (
+        tmp_path / "raw.csv",
+        tmp_path / "interim.parquet",
+        tmp_path / "report.md",
+    )
     dataframe = _valid_dataframe()
-    dataframe.loc[0, "person_age"] = -5
+    dataframe.loc[0, "person_age"] = 144  # one bad row out of three: 33%, but small absolute count
     dataframe.to_csv(raw_path, index=False)
+    _patch_paths(monkeypatch, raw_path, interim_path, report_path)
 
-    monkeypatch.setattr("ingest_data.RAW_DATA_PATH", raw_path)
-    monkeypatch.setattr("ingest_data.INTERIM_DATA_PATH", interim_path)
-    monkeypatch.setattr("ingest_data.QUALITY_REPORT_PATH", report_path)
+    # Three rows total, one excluded, is 33% — above the 5% threshold — so
+    # this is expected to stop the pipeline, exercising that path directly
+    # rather than asserting success here (see the large-dataset variant
+    # in test_exclude_invalid_rows_* above for the exclusion logic itself).
+    assert main() == 1
+    assert not interim_path.exists()
 
-    exit_code = main()
 
-    assert exit_code == 1
+def test_main_stops_for_a_structurally_invalid_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw_path, interim_path, report_path = (
+        tmp_path / "raw.csv",
+        tmp_path / "interim.parquet",
+        tmp_path / "report.md",
+    )
+    _valid_dataframe().drop(columns=["loan_amnt"]).to_csv(raw_path, index=False)
+    _patch_paths(monkeypatch, raw_path, interim_path, report_path)
+
+    assert main() == 1
     assert not interim_path.exists()
     assert not report_path.exists()
 

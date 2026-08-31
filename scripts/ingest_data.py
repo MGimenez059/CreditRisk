@@ -14,8 +14,19 @@ https://www.kaggle.com/datasets/laotse/credit-risk-dataset and place the
 CSV at `data/raw/credit_risk_dataset.csv` before running this script.
 
 Per SPECS.md §28, the eight checks it lists split into two tiers here:
-required columns, dtypes, invalid categories, and impossible numerical
-values are hard failures that stop the pipeline (`validate_dataset`).
+
+- Structural problems (missing columns, wrong dtypes, an entirely-null
+  required column) cannot be fixed by dropping rows — they are hard
+  failures that stop the pipeline entirely (`validate_schema`).
+- Row-level problems (an impossible value, an invalid category) are
+  excluded row by row rather than failing the whole file — a handful of
+  bad rows in an otherwise-valid ~32k-row file is a data engineering
+  reality, not proof the whole file is untrustworthy. Every exclusion is
+  logged with its row index and reason (`exclude_invalid_rows`). If too
+  large a fraction of rows would be excluded, that stops being "a few
+  outliers" and becomes a signal of a systemic problem, so it still stops
+  the pipeline (`MAX_EXCLUDED_ROW_FRACTION`).
+
 Null percentages, duplicate rows, target distribution, and outliers have
 no single "correct" value to enforce — they are surfaced in the data
 quality report (SPECS.md §29) for a human to review, not auto-rejected.
@@ -71,13 +82,19 @@ ALLOWED_CATEGORICAL_VALUES: dict[str, set[str]] = {
 }
 
 # (min, max) inclusive bounds. `None` means unbounded on that side. Chosen
-# to catch data-entry errors (negative amounts, ages outside any plausible
-# adult borrower range), not to reject legitimate outliers — see
-# `compute_data_quality_report`'s "potential_outliers" field for that.
+# to catch data-entry errors (negative amounts, ages/employment lengths no
+# real adult borrower could have), not to reject legitimate outliers — see
+# `compute_data_quality_report`'s "potential_outliers" field for those.
+# `person_emp_length`'s upper bound of 70 and `person_age`'s of 100 are
+# deliberately generous (not the tightest plausible bound) so only
+# genuinely impossible values are excluded, not merely unusual ones —
+# found necessary in practice: the real Kaggle file contains rows with
+# `person_age` of 123-144 and `person_emp_length` of 123, a documented
+# data-entry-error quirk of this dataset.
 NUMERIC_RANGES: dict[str, tuple[float | None, float | None]] = {
     "person_age": (18, 100),
     "person_income": (0, None),
-    "person_emp_length": (0, None),
+    "person_emp_length": (0, 70),
     "loan_amnt": (0, None),
     "loan_int_rate": (0, 100),
     "loan_percent_income": (0, 1),
@@ -87,32 +104,17 @@ NUMERIC_RANGES: dict[str, tuple[float | None, float | None]] = {
 
 TARGET_COLUMN = "loan_status"
 
+# Beyond this fraction of rows excluded by `exclude_invalid_rows`, the
+# problem is treated as systemic rather than "a few outliers" and stops
+# the pipeline instead of silently proceeding with a much-reduced dataset.
+MAX_EXCLUDED_ROW_FRACTION = 0.05
+
 # Correlation threshold above which a numeric feature is flagged as a
 # possible leakage risk (SPECS.md §29's "Potential leakage"). This is a
 # heuristic, not a determination — a flagged column needs a human look,
 # per SPECS.md §28's "stop the pipeline rather than silently corrupting
 # data": this script reports the flag but does not auto-drop the column.
 LEAKAGE_CORRELATION_THRESHOLD = 0.95
-
-
-@dataclass(frozen=True)
-class ValidationResult:
-    """Outcome of validating a raw dataset against the expected schema.
-
-    Attributes:
-        schema_issues: Missing columns, wrong dtypes, or a required column
-            that is entirely null. Any entry here is fatal (SPECS.md §28).
-        value_issues: Out-of-range values or invalid categories. Any entry
-            here is fatal.
-    """
-
-    schema_issues: list[str] = field(default_factory=list)
-    value_issues: list[str] = field(default_factory=list)
-
-    @property
-    def is_valid(self) -> bool:
-        """Whether the dataset passed every check."""
-        return not self.schema_issues and not self.value_issues
 
 
 def load_raw_data(path: Path) -> pd.DataFrame:
@@ -137,6 +139,9 @@ def load_raw_data(path: Path) -> pd.DataFrame:
 
 def validate_schema(dataframe: pd.DataFrame) -> list[str]:
     """Check that every required column is present, non-empty, with a compatible dtype.
+
+    Structural checks only — nothing here can be fixed by dropping a row,
+    so any issue found is a hard failure (SPECS.md §28).
 
     Args:
         dataframe: The raw, loaded dataset.
@@ -170,74 +175,140 @@ def validate_schema(dataframe: pd.DataFrame) -> list[str]:
     return issues
 
 
-def validate_values(dataframe: pd.DataFrame) -> list[str]:
-    """Check categorical values and numeric ranges for impossible values.
+def _raise_if_schema_invalid(issues: list[str]) -> None:
+    """Raise `DataValidationError` if `validate_schema` found any issues.
+
+    Args:
+        issues: Output of `validate_schema`.
+
+    Raises:
+        DataValidationError: If `issues` is non-empty.
+    """
+    if not issues:
+        return
+    formatted = "\n".join(f"  - {issue}" for issue in issues)
+    raise DataValidationError(
+        f"Data validation failed — stopping the pipeline (SPECS.md §28):\n{formatted}"
+    )
+
+
+@dataclass(frozen=True)
+class CleaningResult:
+    """Outcome of removing individually invalid rows from a schema-valid dataset.
+
+    Attributes:
+        cleaned: `dataframe` with invalid rows removed and the index reset.
+        excluded_row_count: How many rows were removed.
+        exclusion_reasons: One human-readable reason per excluded row
+            (`"Row <original index>: <reason>"`), for the data quality
+            report and for manual review of what was dropped and why.
+    """
+
+    cleaned: pd.DataFrame
+    excluded_row_count: int
+    exclusion_reasons: list[str] = field(default_factory=list)
+
+
+def _to_native(value: Any) -> Any:  # noqa: ANN401 -- genuinely any scalar type pandas may hand back
+    """Convert a numpy scalar to a native Python type for clean, readable repr().
+
+    pandas' `.at[]` accessor returns numpy scalars (`numpy.int64`,
+    `numpy.float64`) whose `repr()` is `"np.int64(144)"` rather than
+    `"144"` — unreadable in a human-facing log or report. Non-numpy values
+    (e.g. category strings) pass through unchanged.
+    """
+    return value.item() if hasattr(value, "item") else value
+
+
+def _flag_categorical_violations(
+    dataframe: pd.DataFrame, reasons_by_row: dict[int, list[str]]
+) -> None:
+    """Record a reason for every row whose categorical columns fail `ALLOWED_CATEGORICAL_VALUES`."""
+    for column, allowed_values in ALLOWED_CATEGORICAL_VALUES.items():
+        if column not in dataframe.columns:
+            continue
+        invalid = dataframe[column].notna() & ~dataframe[column].isin(allowed_values)
+        for row_index in dataframe.index[invalid]:
+            value = _to_native(dataframe.at[row_index, column])
+            reasons_by_row.setdefault(row_index, []).append(
+                f"{column}={value!r} not an allowed category"
+            )
+
+
+def _flag_numeric_violations(dataframe: pd.DataFrame, reasons_by_row: dict[int, list[str]]) -> None:
+    """Record a reason for every row whose numeric columns fail `NUMERIC_RANGES`."""
+    for column, (low, high) in NUMERIC_RANGES.items():
+        if column not in dataframe.columns:
+            continue
+        series = dataframe[column]
+        bounds: list[tuple[pd.Series, str, float]] = []
+        if low is not None:
+            bounds.append((series.notna() & (series < low), "below minimum", low))
+        if high is not None:
+            bounds.append((series.notna() & (series > high), "above maximum", high))
+
+        for invalid_mask, bound_kind, bound in bounds:
+            for row_index in dataframe.index[invalid_mask]:
+                value = _to_native(dataframe.at[row_index, column])
+                reasons_by_row.setdefault(row_index, []).append(
+                    f"{column}={value!r} {bound_kind} {bound}"
+                )
+
+
+def exclude_invalid_rows(dataframe: pd.DataFrame) -> CleaningResult:
+    """Remove rows with impossible values or invalid categories, with a reason logged for each.
+
+    Unlike `validate_schema`'s structural checks, a row-level violation
+    here does not fail the whole file — it excludes that one row. Every
+    exclusion is logged by original row index and reason so the exclusion
+    is auditable, never silent, per CODESTYLE.md §8 and SPECS.md §28.
 
     Args:
         dataframe: The raw, loaded dataset. Assumed to have already passed
             `validate_schema`.
 
     Returns:
-        Human-readable issue descriptions. Empty if all values are within
-        the expected domain.
+        The cleaned dataframe alongside a full log of what was excluded
+        and why. Does not raise — see `_raise_if_too_many_excluded` for
+        the safety-threshold check on the result.
     """
-    issues: list[str] = []
+    reasons_by_row: dict[int, list[str]] = {}
+    _flag_categorical_violations(dataframe, reasons_by_row)
+    _flag_numeric_violations(dataframe, reasons_by_row)
 
-    for column, allowed_values in ALLOWED_CATEGORICAL_VALUES.items():
-        if column not in dataframe.columns:
-            continue
-        observed = set(dataframe[column].dropna().unique())
-        unexpected = observed - allowed_values
-        if unexpected:
-            issues.append(f"Column '{column}' has unexpected categories: {sorted(unexpected)}")
+    invalid_rows = sorted(reasons_by_row)
+    exclusion_reasons = [
+        f"Row {row_index}: {'; '.join(reasons_by_row[row_index])}" for row_index in invalid_rows
+    ]
+    cleaned = dataframe.drop(index=invalid_rows).reset_index(drop=True)
 
-    for column, (low, high) in NUMERIC_RANGES.items():
-        if column not in dataframe.columns:
-            continue
-        series = dataframe[column].dropna()
-        if low is not None and (series < low).any():
-            issues.append(f"Column '{column}' has values below the allowed minimum ({low})")
-        if high is not None and (series > high).any():
-            issues.append(f"Column '{column}' has values above the allowed maximum ({high})")
-
-    return issues
+    return CleaningResult(
+        cleaned=cleaned,
+        excluded_row_count=len(invalid_rows),
+        exclusion_reasons=exclusion_reasons,
+    )
 
 
-def validate_dataset(dataframe: pd.DataFrame) -> ValidationResult:
-    """Run schema and value validation together.
-
-    Value validation only runs if the schema is valid — checking ranges on
-    a column with the wrong dtype, or a missing column, isn't meaningful.
+def _raise_if_too_many_excluded(result: CleaningResult, total_rows: int) -> None:
+    """Raise `DataValidationError` if too large a fraction of rows were excluded.
 
     Args:
-        dataframe: The raw, loaded dataset.
-
-    Returns:
-        The combined validation result.
-    """
-    schema_issues = validate_schema(dataframe)
-    value_issues = validate_values(dataframe) if not schema_issues else []
-    return ValidationResult(schema_issues=schema_issues, value_issues=value_issues)
-
-
-def _raise_if_invalid(result: ValidationResult) -> None:
-    """Raise `DataValidationError` if validation found any issues.
-
-    The single point where a `ValidationResult` becomes a stopped pipeline,
-    per CODESTYLE.md §9: data pipeline validation failures must stop the
-    pipeline, never be logged and ignored or silently coerced.
-
-    Args:
-        result: Output of `validate_dataset`.
+        result: Output of `exclude_invalid_rows`.
+        total_rows: Row count of the dataset before exclusion.
 
     Raises:
-        DataValidationError: If any schema or value issue was found.
+        DataValidationError: If the excluded fraction exceeds
+            `MAX_EXCLUDED_ROW_FRACTION`.
     """
-    if result.is_valid:
+    fraction = result.excluded_row_count / total_rows if total_rows else 0.0
+    if fraction <= MAX_EXCLUDED_ROW_FRACTION:
         return
-    issues = "\n".join(f"  - {issue}" for issue in [*result.schema_issues, *result.value_issues])
+    reasons = "\n".join(f"  - {reason}" for reason in result.exclusion_reasons)
     raise DataValidationError(
-        f"Data validation failed — stopping the pipeline (SPECS.md §28):\n{issues}"
+        f"{result.excluded_row_count} of {total_rows} rows ({fraction:.1%}) have "
+        f"impossible values — exceeds the {MAX_EXCLUDED_ROW_FRACTION:.0%} safety "
+        f"threshold (SPECS.md §28), which usually means a structural problem rather "
+        f"than a few outliers. Reasons:\n{reasons}"
     )
 
 
@@ -253,7 +324,7 @@ def _compute_outliers(dataframe: pd.DataFrame, numeric_columns: list[str]) -> di
     """Count IQR-method outliers per numeric column.
 
     Args:
-        dataframe: The raw, loaded dataset.
+        dataframe: The (already-cleaned) dataset.
         numeric_columns: Columns to check, excluding the target.
 
     Returns:
@@ -277,7 +348,7 @@ def _compute_leakage_flags(dataframe: pd.DataFrame, numeric_columns: list[str]) 
     feature can also score high) — see the module docstring's tiering.
 
     Args:
-        dataframe: The raw, loaded dataset.
+        dataframe: The (already-cleaned) dataset.
         numeric_columns: Columns to check, excluding the target.
 
     Returns:
@@ -297,16 +368,21 @@ def _compute_leakage_flags(dataframe: pd.DataFrame, numeric_columns: list[str]) 
     }
 
 
-def compute_data_quality_report(dataframe: pd.DataFrame) -> DataQualityReport:
+def compute_data_quality_report(
+    dataframe: pd.DataFrame, cleaning_result: CleaningResult | None = None
+) -> DataQualityReport:
     """Compute the data quality report fields required by SPECS.md §29.
 
     Args:
-        dataframe: The raw, loaded dataset.
+        dataframe: The (already-cleaned) dataset that will be persisted.
+        cleaning_result: Output of `exclude_invalid_rows`, if row exclusion
+            ran. Adds an `excluded_rows` section when provided.
 
     Returns:
         A dict with rows, columns, missing values (count and percentage),
         duplicates, unique values, numerical and categorical distributions,
-        target distribution, potential outliers, and potential leakage.
+        target distribution, potential outliers, potential leakage, and
+        (when `cleaning_result` is given) excluded row count and reasons.
     """
     numeric_columns = [
         column
@@ -322,7 +398,7 @@ def compute_data_quality_report(dataframe: pd.DataFrame) -> DataQualityReport:
         column: int(count) for column, count in dataframe.isna().sum().items() if count > 0
     }
 
-    return {
+    report: DataQualityReport = {
         "rows": row_count,
         "columns": len(dataframe.columns),
         "missing_values": missing_counts,
@@ -349,6 +425,14 @@ def compute_data_quality_report(dataframe: pd.DataFrame) -> DataQualityReport:
         "potential_leakage": _compute_leakage_flags(dataframe, numeric_columns),
     }
 
+    if cleaning_result is not None:
+        report["excluded_rows"] = {
+            "count": cleaning_result.excluded_row_count,
+            "reasons": cleaning_result.exclusion_reasons,
+        }
+
+    return report
+
 
 def render_quality_report_markdown(report: DataQualityReport, source_path: Path) -> str:
     """Render the data quality report dict as Markdown.
@@ -366,13 +450,23 @@ def render_quality_report_markdown(report: DataQualityReport, source_path: Path)
         "",
         f"Generated from `{source_path}`. See SPECS.md §29 for the field list this report follows.",
         "",
-        f"- **Rows:** {report['rows']}",
+        f"- **Rows (after exclusions):** {report['rows']}",
         f"- **Columns:** {report['columns']}",
         f"- **Duplicate rows:** {report['duplicate_rows']}",
         "",
-        "## Missing values",
-        "",
     ]
+
+    if "excluded_rows" in report:
+        lines += ["## Excluded rows (impossible values)", ""]
+        excluded = report["excluded_rows"]
+        if excluded["count"]:
+            lines.append(f"{excluded['count']} row(s) excluded before this report was computed:")
+            lines += [f"- {reason}" for reason in excluded["reasons"]]
+        else:
+            lines.append("None excluded.")
+        lines.append("")
+
+    lines += ["## Missing values", ""]
     if report["missing_values"]:
         lines += [
             f"- `{col}`: {count} ({report['missing_percentages'][col]}%)"
@@ -400,19 +494,31 @@ def render_quality_report_markdown(report: DataQualityReport, source_path: Path)
 
 
 def main() -> int:
-    """Run data ingestion end-to-end: load, validate, report, and persist.
+    """Run data ingestion end-to-end: load, validate, clean, report, and persist.
 
     Returns:
         Process exit code: 0 on success, 1 if the pipeline cannot proceed.
     """
     try:
         dataframe = load_raw_data(RAW_DATA_PATH)
-        _raise_if_invalid(validate_dataset(dataframe))
+        _raise_if_schema_invalid(validate_schema(dataframe))
+
+        cleaning_result = exclude_invalid_rows(dataframe)
+        _raise_if_too_many_excluded(cleaning_result, total_rows=len(dataframe))
     except DataValidationError as err:
         print(err, file=sys.stderr)
         return 1
 
-    report = compute_data_quality_report(dataframe)
+    if cleaning_result.excluded_row_count:
+        print(
+            f"Excluded {cleaning_result.excluded_row_count} row(s) with impossible values:",
+            file=sys.stderr,
+        )
+        for reason in cleaning_result.exclusion_reasons:
+            print(f"  - {reason}", file=sys.stderr)
+
+    cleaned = cleaning_result.cleaned
+    report = compute_data_quality_report(cleaned, cleaning_result)
     QUALITY_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     QUALITY_REPORT_PATH.write_text(
         render_quality_report_markdown(report, RAW_DATA_PATH), encoding="utf-8"
@@ -420,7 +526,7 @@ def main() -> int:
     print(f"Data quality report written to '{QUALITY_REPORT_PATH}'.")
 
     INTERIM_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    dataframe.to_parquet(INTERIM_DATA_PATH, index=False)
+    cleaned.to_parquet(INTERIM_DATA_PATH, index=False)
     print(f"Validated dataset written to '{INTERIM_DATA_PATH}'.")
 
     return 0
