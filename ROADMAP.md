@@ -5,36 +5,36 @@
 ---
 
 ## Phase 0 — Planning
-- [x] Define MVP scope and non-goals (no real PII, no automated loan approval)
-- [x] Select a public credit risk dataset (Kaggle / UCI / OpenML / LendingClub-derived)
-- [x] Document dataset provenance (source, version, license, URL, record count, target)
-- [x] Define the binary target `loan_status` (0 = no default, 1 = default) and verify the real mapping
-- [x] Define initial features (see suggested schema: age, income, employment, amount, rate, credit history, etc.)
+- [ ] Define MVP scope and non-goals (no real PII, no automated loan approval)
+- [ ] Select a public credit risk dataset (Kaggle / UCI / OpenML / LendingClub-derived)
+- [ ] Document dataset provenance (source, version, license, URL, record count, target)
+- [ ] Define the binary target `loan_status` (0 = no default, 1 = default) and verify the real mapping
+- [ ] Define initial features (see suggested schema: age, income, employment, amount, rate, credit history, etc.)
 
 ## Phase 1 — Repository
-- [x] Initialize a Python 3.12+ project with `pyproject.toml`
-- [x] Create the `src/credit_risk/` package structure (api, config, db, schemas, repositories, services, ml)
-- [x] Configure Ruff, MyPy, and pre-commit
-- [x] Configure Pytest
-- [x] Configure environment variables (`.env.example`)
-- [x] Write the initial README
+- [ ] Initialize a Python 3.12+ project with `pyproject.toml`
+- [ ] Create the `src/credit_risk/` package structure (api, config, db, schemas, repositories, services, ml)
+- [ ] Configure Ruff, MyPy, and pre-commit
+- [ ] Configure Pytest
+- [ ] Configure environment variables (`.env.example`)
+- [ ] Write the initial README
 
 ## Phase 2 — Data
-- [ ] Download and store the dataset (evaluate whether to commit it based on license/size) — pending: needs a real download from Kaggle, not runnable from an unattended environment; see `scripts/ingest_data.py`'s module docstring
+- [x] Download and store the dataset (evaluate whether to commit it based on license/size) — downloaded manually per the user, run through `scripts/ingest_data.py`; the raw CSV is not committed (license unclear, see `docs/data_dictionary.md`)
 - [x] Implement the ingestion script (`scripts/ingest_data.py`)
 - [x] Validate the dataset schema (types, ranges, nulls)
-- [x] Generate a data quality report
-- [ ] Perform EDA (notebook `01_data_exploration.ipynb` is written and ready to run, but has not been executed against the real dataset yet — no outputs to review until Phase 2's data download step is done)
+- [x] Generate a data quality report — real report at `docs/data_quality_report.md`, 32,574 of 32,581 rows kept
+- [x] Perform EDA (`notebooks/01_data_exploration.ipynb`, executed against the real dataset — see its "Notes for Phase 3" cell for the `loan_grade` leakage finding)
 - [x] Document the data dictionary (`docs/data_dictionary.md`)
-- [ ] Prevent data leakage (exclude post-outcome variables from the feature set) — `scripts/ingest_data.py` now *detects* likely leakage via correlation with the target as part of the quality report; actually excluding leaky columns from the trained feature set is a Phase 3 task once real feature engineering starts
+- [x] Prevent data leakage (exclude post-outcome variables from the feature set) — `loan_grade` excluded from `credit_risk.ml.preprocessing.ALL_FEATURE_COLUMNS`, see `docs/model_card.md`'s Limitations section for the reasoning
 
 ## Phase 3 — ML Baseline
-- [ ] Create a train/validation/test split (stratified by target)
-- [ ] Build the preprocessing and feature engineering pipeline (`ml/preprocessing.py`, `ml/features.py`)
-- [ ] Handle class imbalance
-- [ ] Train Logistic Regression as a baseline
-- [ ] Evaluate the baseline with discrimination metrics (ROC-AUC, PR-AUC)
-- [ ] Add Random Forest as a second baseline
+- [x] Create a train/validation/test split (stratified by target) — 70/15/15, `random_state=42` (`credit_risk.ml.train.split_dataset`)
+- [x] Build the preprocessing and feature engineering pipeline (`ml/preprocessing.py`, `ml/features.py`)
+- [x] Handle class imbalance — `class_weight="balanced"`; measured via `measure_class_balance` (21.82% positive)
+- [x] Train Logistic Regression as a baseline — ROC-AUC 0.8491 on validation, see `docs/model_card.md`
+- [x] Evaluate the baseline with discrimination metrics (ROC-AUC, PR-AUC) — `credit_risk.ml.evaluate.evaluate_model`
+- [x] Add Random Forest as a second baseline — ROC-AUC 0.9211 on validation, outperforms Logistic Regression on every metric
 
 ## Phase 4 — XGBoost (primary model)
 - [ ] Train the first XGBoost model
