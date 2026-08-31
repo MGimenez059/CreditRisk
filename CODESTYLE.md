@@ -333,7 +333,7 @@ Enforced automatically via `pre-commit` and CI (GitHub Actions) — no rule in t
 ```text
 ruff format --check   # formatting
 ruff check            # linting
-mypy src              # strict type checking
+mypy src scripts      # strict type checking
 pytest                # unit + integration tests
 ```
 
