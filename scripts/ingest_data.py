@@ -448,7 +448,7 @@ def render_quality_report_markdown(report: DataQualityReport, source_path: Path)
     lines = [
         "# Data Quality Report",
         "",
-        f"Generated from `{source_path}`. See SPECS.md §29 for the field list this report follows.",
+        f"Generated from `{source_path.as_posix()}`. See SPECS.md §29 for the field list.",
         "",
         f"- **Rows (after exclusions):** {report['rows']}",
         f"- **Columns:** {report['columns']}",
