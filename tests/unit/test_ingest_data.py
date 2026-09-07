@@ -219,6 +219,9 @@ def test_quality_report_renders_to_markdown() -> None:
 
     assert "# Data Quality Report" in markdown
     assert "Target distribution" in markdown
+    assert "Numerical distributions" in markdown
+    assert "Categorical distributions" in markdown
+    assert "does not rule out leakage" in markdown
 
 
 def test_quality_report_markdown_lists_excluded_row_reasons() -> None:

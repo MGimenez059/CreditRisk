@@ -8,7 +8,7 @@ CODESTYLE.md §6.
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 HomeOwnership = Literal["RENT", "OWN", "MORTGAGE", "OTHER"]
 LoanIntent = Literal[
@@ -25,19 +25,23 @@ RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 class PredictionRequest(BaseModel):
     """A single loan application submitted for a default-probability prediction."""
 
-    age: int = Field(..., gt=0, lt=120, description="Applicant age in years.")
-    income: float = Field(..., ge=0, description="Annual income, in the dataset's currency unit.")
-    employment_years: float = Field(..., ge=0, description="Years in current employment.")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    age: int = Field(..., ge=18, le=100, description="Applicant age in years.")
+    income: float = Field(..., gt=0, description="Annual income, in the dataset's currency unit.")
+    employment_years: float | None = Field(
+        ..., ge=0, le=70, description="Years in current employment."
+    )
     home_ownership: HomeOwnership
     loan_amount: float = Field(..., gt=0)
-    interest_rate: float = Field(..., ge=0, description="Annual interest rate, as a percentage.")
-    term_months: int | None = Field(default=None, gt=0)
+    interest_rate: float | None = Field(
+        ..., ge=0, le=100, description="Annual interest rate, as a percentage."
+    )
     loan_intent: LoanIntent
     credit_history_years: int = Field(..., ge=0)
-    late_payments: int | None = Field(default=None, ge=0)
-    previous_defaults: int | None = Field(default=None, ge=0)
-    credit_utilization: float | None = Field(default=None, ge=0, le=1)
-    active_credit_lines: int | None = Field(default=None, ge=0)
+    previous_defaults: Literal[0, 1] = Field(
+        ..., description="Prior default flag: 0=no, 1=yes; not a count."
+    )
 
 
 class ModelInfo(BaseModel):

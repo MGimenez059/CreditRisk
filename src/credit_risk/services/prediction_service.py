@@ -166,4 +166,18 @@ class PredictionService:
 
 def _to_feature_frame(request: PredictionRequest) -> pd.DataFrame:
     """Convert a validated request into the single-row frame the pipeline expects."""
-    return pd.DataFrame([request.model_dump()])
+    return pd.DataFrame(
+        [
+            {
+                "person_age": request.age,
+                "person_income": request.income,
+                "person_emp_length": request.employment_years,
+                "person_home_ownership": request.home_ownership,
+                "loan_amnt": request.loan_amount,
+                "loan_int_rate": request.interest_rate,
+                "loan_intent": request.loan_intent,
+                "cb_person_cred_hist_length": request.credit_history_years,
+                "cb_person_default_on_file": "Y" if request.previous_defaults else "N",
+            }
+        ]
+    )

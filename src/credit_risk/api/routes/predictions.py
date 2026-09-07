@@ -38,7 +38,7 @@ def _to_response(result: PredictionResult) -> PredictionResponse:
 
 
 @router.post("", response_model=PredictionResponse)
-async def create_prediction(
+def create_prediction(
     payload: PredictionRequest,
     prediction_service: Annotated[PredictionService, Depends(get_prediction_service)],
 ) -> PredictionResponse:
@@ -53,7 +53,7 @@ async def create_prediction(
 
 
 @router.post("/batch", response_model=BatchPredictionResponse)
-async def create_batch_prediction(
+def create_batch_prediction(
     payload: list[PredictionRequest],
     prediction_service: Annotated[PredictionService, Depends(get_prediction_service)],
     settings: Annotated[Settings, Depends(get_settings)],

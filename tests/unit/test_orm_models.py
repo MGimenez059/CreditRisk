@@ -31,14 +31,11 @@ def test_customer_constructs_with_canonical_field_names() -> None:
     assert customer.home_ownership is HomeOwnership.RENT
 
 
-def test_credit_history_previous_defaults_is_an_integer_count() -> None:
+def test_credit_history_previous_defaults_is_a_binary_source_indicator() -> None:
     history = CreditHistory(
         customer_id=uuid.uuid4(),
         credit_history_years=7,
         previous_defaults=0,
-        late_payments=1,
-        credit_utilization=0.42,
-        active_credit_lines=4,
     )
 
     assert history.previous_defaults == 0
@@ -50,7 +47,6 @@ def test_loan_constructs_with_canonical_field_names() -> None:
         customer_id=uuid.uuid4(),
         amount=500_000,
         interest_rate=12.5,
-        term_months=36,
         purpose=LoanIntent.PERSONAL,
         grade=LoanGrade.A,
         loan_status=0,

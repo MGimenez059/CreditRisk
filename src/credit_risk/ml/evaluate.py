@@ -12,6 +12,8 @@ from sklearn.metrics import (
     brier_score_loss,
     f1_score,
     log_loss,
+    precision_score,
+    recall_score,
     roc_auc_score,
 )
 
@@ -31,7 +33,7 @@ class EvaluationReport:
 
     Attributes:
         roc_auc: Area under the ROC curve — discrimination, threshold-independent.
-        pr_auc: Area under the precision-recall curve — more informative
+        pr_auc: Average precision (non-interpolated PR summary) — more informative
             than ROC-AUC alone on an imbalanced target (SPECS.md §11).
         f1: F1 score at `DEFAULT_CLASSIFICATION_THRESHOLD`.
         log_loss: Cross-entropy loss on the predicted probabilities.
@@ -44,6 +46,8 @@ class EvaluationReport:
     f1: float
     log_loss: float
     brier_score: float
+    precision: float
+    recall: float
 
 
 def evaluate_model(
@@ -72,4 +76,6 @@ def evaluate_model(
         f1=float(f1_score(holdout_target, predictions)),
         log_loss=float(log_loss(holdout_target, probabilities)),
         brier_score=float(brier_score_loss(holdout_target, probabilities)),
+        precision=float(precision_score(holdout_target, predictions, zero_division=0)),
+        recall=float(recall_score(holdout_target, predictions, zero_division=0)),
     )

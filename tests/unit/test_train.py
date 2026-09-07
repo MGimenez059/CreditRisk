@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from credit_risk.ml.features import add_derived_features
 from credit_risk.ml.train import (
     build_baseline_pipeline,
     measure_class_balance,
@@ -42,7 +41,7 @@ def _synthetic_dataset(n: int = 200) -> pd.DataFrame:
             "cb_person_cred_hist_length": rng.integers(1, 25, n),
         }
     )
-    return add_derived_features(frame)
+    return frame
 
 
 # --- measure_class_balance -----------------------------------------------

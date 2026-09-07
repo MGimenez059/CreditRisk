@@ -2,79 +2,85 @@
 
 ## Dataset provenance
 
-| | |
+| Item | Value |
 |---|---|
-| **Source** | Kaggle — [`laotse/credit-risk-dataset`](https://www.kaggle.com/datasets/laotse/credit-risk-dataset) |
-| **Records** | 32,581 rows |
-| **Columns** | 12 (11 features + 1 target) |
-| **Target** | `loan_status` (0 = no default, 1 = default) |
-| **License** | Not machine-readable on the Kaggle listing at the time of writing — confirm the current license on the dataset page before redistributing the raw file. The raw CSV is **not** committed to this repository (see `.gitignore`). |
-| **Dataset version** | Pinned per training run in `ModelArtifactMetadata.dataset_version` (see `docs/architecture.md`), not hardcoded here, so this document does not go stale when the source dataset is updated upstream. |
+| Source | [Kaggle: laotse/credit-risk-dataset](https://www.kaggle.com/datasets/laotse/credit-risk-dataset) |
+| Historical raw size | 32,581 rows, 12 columns |
+| Target convention | loan_status: 0 = no default, 1 = default |
+| License | Kaggle metadata reports CC0: Public Domain; verified 2026-09-07 |
+| Source version/download date | Version 1, downloaded 2026-09-07; source last updated 2020-06-02 |
+| Snapshot identifier | Baseline CLI records SHA-256 of the validated Parquet actually used |
+| Population and collection process | Not independently verified; do not assert synthetic origin or real-world representativeness |
+| Default definition/horizon | Source confirms 0 = non-default, 1 = default; observation horizon unspecified |
 
-This is a synthetic/anonymized public dataset used for portfolio and educational purposes. It does not represent real applicants — see [Ethical Considerations](../README.md#ethical-considerations) in the README.
+The code's MIT license does not establish dataset redistribution rights. Raw data is
+not committed. [Source version/license evidence](dataset_provenance.json) and a local file hash serve different
+purposes; a hash identifies the input bytes but does not prove upstream provenance.
 
 ## Getting the raw file
 
-Kaggle requires an authenticated account to download datasets, and this project has no Kaggle client in its dependencies (see `README.md`'s Tech Stack table), so `scripts/ingest_data.py` does not auto-download anything. Steps:
+1. Download the CSV manually from the source page (sign in if requested).
+2. Save it as `data/raw/credit_risk_dataset.csv`.
+3. Run `uv run --locked python scripts/ingest_data.py`.
+4. Run `uv run --locked python scripts/train_baselines.py`.
 
-1. Download the CSV from the [dataset page](https://www.kaggle.com/datasets/laotse/credit-risk-dataset) (Kaggle account required).
-2. Save it as `data/raw/credit_risk_dataset.csv` — this exact path is what `scripts/ingest_data.py` expects.
-3. Run `python scripts/ingest_data.py`. It validates the file against the schema below (stopping immediately on any schema or value violation, per `SPECS.md §28`), writes `docs/data_quality_report.md`, and — only if validation passes — writes a cleaned copy to `data/interim/credit_risk_validated.parquet` for Phase 3.
+Ingestion validates structural schema errors first. Defined row-level value violations
+are excluded with a reason; more than 5% exclusions stop the pipeline. Unexpected
+structural failures also stop it. This explicit cleaning policy is different from
+silently ignoring validation errors. Null employment duration and rate are retained
+for training-only imputation. Zero income is rejected by the feature builder/API
+because the loan-to-income ratio would be undefined.
 
-`docs/data_quality_report.md` is generated, not written by hand — it doesn't exist in this repo until step 3 has been run at least once, and per `SPECS.md §29` it isn't necessarily re-committed on every single run.
+The script writes validated Parquet and a generated quality report. The committed
+report was regenerated on 2026-09-07; see [provenance](dataset_provenance.json) for
+source metadata and raw/validated SHA-256 values. The public download API allowed
+unauthenticated access during this run; the ingestion command itself remains local-file only.
 
-## Raw source columns
+## Source columns and API mapping
 
-| Column | Type | Description | Notes |
-|---|---|---|---|
-| `person_age` | int | Applicant age in years | |
-| `person_income` | float | Annual income | Currency unit as provided by the source, not specified upstream |
-| `person_home_ownership` | categorical | `RENT`, `OWN`, `MORTGAGE`, `OTHER` | |
-| `person_emp_length` | float | Years in current employment | Contains nulls in the raw file |
-| `loan_intent` | categorical | `PERSONAL`, `EDUCATION`, `MEDICAL`, `VENTURE`, `HOMEIMPROVEMENT`, `DEBTCONSOLIDATION` | |
-| `loan_grade` | categorical | `A` through `G`, lender-assigned | |
-| `loan_amnt` | float | Requested loan amount | |
-| `loan_int_rate` | float | Annual interest rate (%) | Contains nulls in the raw file |
-| `loan_status` | int | **Target.** 0 = no default, 1 = default | |
-| `loan_percent_income` | float | `loan_amnt` as a fraction of `person_income` | Derivable; kept as-is from source rather than recomputed, pending a Phase 2 leakage review |
-| `cb_person_default_on_file` | categorical | `Y` / `N` — prior default on credit bureau file | |
-| `cb_person_cred_hist_length` | int | Credit history length, in years | |
-
-## Mapping across the three naming layers
-
-This project uses three distinct naming layers by design, matching SPECS.md exactly rather than collapsing them into one:
-
-1. **Source dataset columns** (Kaggle) — `person_age`, `loan_amnt`, etc.
-2. **API field names** (`schemas/prediction.py`, SPECS.md §20) — `age`, `loan_amount`, `loan_intent`. This is the public JSON contract in `README.md`.
-3. **Canonical DB column names** (`db/models/`, SPECS.md §6) — `age`, `amount`, `purpose`. Mostly identical to the API names, but `Loan.amount` and `Loan.purpose` are deliberately renamed from the API's `loan_amount` / `loan_intent`; translating between the two is a repository/service-layer concern, documented directly in `db/models/loan.py`.
-
-| Source column | API field (`PredictionRequest`) | Canonical DB column |
+| Source | API field | Meaning |
 |---|---|---|
-| `person_age` | `age` | `Customer.age` |
-| `person_income` | `income` | `Customer.income` |
-| `person_home_ownership` | `home_ownership` | `Customer.home_ownership` |
-| `person_emp_length` | `employment_years` | `Customer.employment_years` |
-| `loan_intent` | `loan_intent` | `Loan.purpose` |
-| `loan_grade` | — (not yet in `PredictionRequest`) | `Loan.grade` |
-| `loan_amnt` | `loan_amount` | `Loan.amount` |
-| `loan_int_rate` | `interest_rate` | `Loan.interest_rate` |
-| `loan_percent_income` | — | `Loan.loan_percent_income` (kept for source parity, not in SPECS.md §6's canonical model) |
-| `cb_person_cred_hist_length` | `credit_history_years` | `CreditHistory.credit_history_years` |
-| `cb_person_default_on_file` (`Y`/`N`) | `previous_defaults` (int) | `CreditHistory.previous_defaults` (int; source boolean mapped to `0`/`1`) |
-| `loan_status` | — (never a request field, per SPECS.md §7) | `Loan.loan_status` — historical training label only |
+| person_age | age | Age in years; accepted range 18–100 |
+| person_income | income | Annual income, positive for modeling; currency unverified |
+| person_home_ownership | home_ownership | RENT, OWN, MORTGAGE, OTHER |
+| person_emp_length | employment_years | Employment duration, 0–70 years; nullable |
+| loan_intent | loan_intent | PERSONAL, EDUCATION, MEDICAL, VENTURE, HOMEIMPROVEMENT, DEBTCONSOLIDATION |
+| loan_grade | Excluded | Source grade A–G; derivation/availability unverified |
+| loan_amnt | loan_amount | Positive loan amount, same monetary unit as income |
+| loan_int_rate | interest_rate | Annual percent, 0–100; nullable |
+| loan_percent_income | Not accepted | Source ratio; replaced by recomputed loan_to_income |
+| cb_person_default_on_file | previous_defaults | N/Y maps to required 0/1 indicator, not a count |
+| cb_person_cred_hist_length | credit_history_years | Non-negative history length in years |
+| loan_status | Never accepted | Historical target, never a feature |
 
-## Known gap: fields with no source column
+The API adapter maps public names to the nine `RAW_FEATURE_COLUMNS`. PostgreSQL's
+optional Loan scaffold uses `amount` and `purpose` for `loan_amount` and `loan_intent`;
+this storage mapping is independent of model training. Customer/loan CRUD is deferred.
 
-The public API contract in `README.md` / `SPECS.md` §20 and `PredictionRequest` (`src/credit_risk/schemas/prediction.py`) includes four fields that **do not exist** in the Phase 0 dataset:
+## Derived features
 
-- `term_months`
-- `late_payments`
-- `credit_utilization`
-- `active_credit_lines`
+- `loan_to_income = loan_amnt / person_income`.
+- `income_per_employment_year = person_income / max(person_emp_length, 1)`.
+- `credit_age_ratio = cb_person_cred_hist_length / max(person_age, 1)`.
 
-These are modeled as **nullable** columns on `CreditHistory` and `Loan` (see `src/credit_risk/db/models/`) rather than removed, because they are realistic and commonly available fields in a production credit bureau feed, and the API is designed against that eventual reality. Until a richer dataset is ingested or these are engineered as proxies, the Phase 3/4 preprocessing pipeline must either:
+Missing employment values propagate to the derived ratio and are imputed using
+training medians. Derivation occurs inside the serialized pipeline. The source
+ratio may have rounding differences and is not treated as an identical stored copy.
+`debt_to_income` and `late_payment_rate` are not available from this dataset.
 
-1. drop them from the trained feature set entirely (recommended for the first XGBoost baseline), or
-2. impute them and flag the imputation, clearly documented in `docs/model_card.md`'s Limitations section once a model is trained.
+## Unsupported fields
 
-This gap is intentional and tracked here rather than silently papered over with fabricated values.
+`term_months`, `late_payments`, `credit_utilization` and `active_credit_lines` were
+removed from the unreleased contract and ORM scaffold. Do not impute features with
+no observed source values or invent proxies merely to satisfy an illustrative schema.
+
+## Prediction time and leakage
+
+The current demo assumes a loan offer with a known rate, or an explicitly missing
+rate represented as null. It does not claim to score an application before pricing.
+The actual source timing for loan_int_rate and loan_grade remains unverified.
+Grade is excluded conservatively; strong target association alone does not establish
+leakage. Reassess both fields under a pre-pricing use case.
+
+Identical raw model inputs form one split group, including conflicting target labels.
+This preserves rows while preventing duplicate inputs from crossing evaluation boundaries.

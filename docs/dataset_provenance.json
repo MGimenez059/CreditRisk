@@ -1,0 +1,12 @@
+{
+  "source_url": "https://www.kaggle.com/datasets/laotse/credit-risk-dataset",
+  "metadata_url": "https://www.kaggle.com/api/v1/datasets/view/laotse/credit-risk-dataset",
+  "download_url": "https://www.kaggle.com/api/v1/datasets/download/laotse/credit-risk-dataset",
+  "download_date": "2026-09-07",
+  "source_version": 1,
+  "source_last_updated": "2020-06-02T06:10:39.067Z",
+  "source_license": "CC0: Public Domain",
+  "source_description": "Detailed data description of Credit Risk dataset:\n| **Feature Name** | **Description** | \n| --- | --- |\n| person_age | Age | \n| person_income | Annual Income | \n| person_home_ownership | Home ownership |\n| person_emp_length | Employment length (in years) | \n| loan_intent | Loan intent |  \n| loan_grade | Loan grade | \n| loan_amnt | Loan amount | \n| loan_int_rate | Interest rate | | \n| loan_status | Loan status (0 is non default 1 is default) | \n| loan_percent_income | Percent income | \n| cb_person_default_on_file | Historical default | \n| cb_preson_cred_hist_length | Credit history length | \n",
+  "raw_csv_sha256": "ce3c6d2167717bf1627d1c0c81cbccd28323cd4aa7b96d542599366d5ff6aac8",
+  "validated_parquet_sha256": "a0a7ff1fe7f28c7ac03e35124aca01735d23df53a51b51bc5393859665257767"
+}

@@ -29,20 +29,21 @@ CATEGORICAL_FEATURES = [
     "cb_person_default_on_file",
 ]
 
-# `loan_grade` is deliberately excluded from both feature lists above.
-# SPECS.md §8 lists it as a candidate "Loan feature", but SPECS.md §9 rule
-# 5 ("avoid features that would only be available after the credit
-# decision") takes precedence: the lender assigns `loan_grade` as part of
-# the same underwriting decision this model is meant to inform. Its
-# near-perfect correlation with the target in the real dataset (grade G
-# defaults at ~98%, per the EDA in notebooks/01_data_exploration.ipynb) is
-# consistent with that leakage risk rather than genuine independent
-# signal. See docs/model_card.md's Limitations section.
+# Excluded conservatively because its availability and derivation are unverified.
+# Strong association with default is not proof of leakage; see the model card.
 EXCLUDED_LEAKAGE_RISK_FEATURES = ["loan_grade"]
 
-# Also excluded: `loan_percent_income`, superseded by the derived
-# `loan_to_income` in NUMERIC_FEATURES above (identical computation,
-# re-derived from raw columns) — see `ml.features`'s module docstring.
+# Source loan_percent_income is replaced by the reproducible loan_to_income ratio.
+RAW_FEATURE_COLUMNS = [
+    "person_age",
+    "person_income",
+    "person_emp_length",
+    "loan_amnt",
+    "loan_int_rate",
+    "cb_person_cred_hist_length",
+    *CATEGORICAL_FEATURES,
+]
+
 ALL_FEATURE_COLUMNS = [*NUMERIC_FEATURES, *CATEGORICAL_FEATURES]
 
 

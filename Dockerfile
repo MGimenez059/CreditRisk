@@ -19,21 +19,21 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir uv==0.11.2
+
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
-RUN pip install --no-cache-dir .
+RUN uv sync --locked --no-dev --no-editable --python /usr/local/bin/python
 
 FROM base AS runtime
 
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 COPY src ./src
 COPY alembic ./alembic
 COPY alembic.ini ./
-COPY models ./models
-
-RUN useradd --create-home --uid 1000 appuser
+RUN mkdir -p /app/models && useradd --create-home --uid 1000 appuser
 USER appuser
 
 EXPOSE 8000

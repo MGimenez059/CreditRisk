@@ -6,9 +6,9 @@ schema in `docs/data_dictionary.md`, writes a data quality report, and (if
 validation passes) writes a cleaned copy to `data/interim/` ready for
 Phase 3 feature engineering.
 
-This dataset (Kaggle `laotse/credit-risk-dataset`) is not auto-downloaded:
-Kaggle requires an authenticated account to fetch it, and no Kaggle client
-is in this project's dependencies (see `README.md`'s Tech Stack table).
+This command expects a locally downloaded CSV and does not fetch it.
+The public Kaggle download API was accessible without authentication on
+2026-09-07; availability may change. No Kaggle client is required.
 Download it manually from
 https://www.kaggle.com/datasets/laotse/credit-risk-dataset and place the
 CSV at `data/raw/credit_risk_dataset.csv` before running this script.
@@ -35,6 +35,7 @@ Usage:
     python scripts/ingest_data.py
 """
 
+import hashlib
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -449,6 +450,7 @@ def render_quality_report_markdown(report: DataQualityReport, source_path: Path)
         "# Data Quality Report",
         "",
         f"Generated from `{source_path.as_posix()}`. See SPECS.md §29 for the field list.",
+        f"Raw CSV SHA-256: `{report.get('source_sha256', 'not recorded')}`.",
         "",
         f"- **Rows (after exclusions):** {report['rows']}",
         f"- **Columns:** {report['columns']}",
@@ -481,12 +483,28 @@ def render_quality_report_markdown(report: DataQualityReport, source_path: Path)
     lines += ["", "## Potential outliers (IQR method, per numeric column)", ""]
     lines += [f"- `{col}`: {count} rows" for col, count in report["potential_outliers"].items()]
 
-    lines += ["", "## Potential leakage (|correlation with target| ≥ 0.95)", ""]
+    lines += ["", "## Numeric leakage screen (|correlation with target| ≥ 0.95)", ""]
     if report["potential_leakage"]:
         lines += [f"- `{col}`: {corr}" for col, corr in report["potential_leakage"].items()]
     else:
-        lines.append("None flagged.")
+        lines.append("None flagged by this numeric-only screen. This does not rule out leakage.")
 
+    lines += ["", "Categorical leakage and feature availability require manual review.", ""]
+    lines += [
+        "## Numerical distributions",
+        "",
+        "| Feature | Count | Mean | Std | Min | 25% | Median | 75% | Max |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for column, statistics in report["numerical_distributions"].items():
+        values = " | ".join(
+            f"{statistics[key]:.4f}"
+            for key in ("count", "mean", "std", "min", "25%", "50%", "75%", "max")
+        )
+        lines.append(f"| {column} | {values} |")
+    lines += ["", "## Categorical distributions", ""]
+    for column, counts in report["categorical_distributions"].items():
+        lines.append(f"- `{column}`: {counts}")
     lines += ["", "## Unique values per column", ""]
     lines += [f"- `{col}`: {count}" for col, count in report["unique_values"].items()]
 
@@ -519,6 +537,7 @@ def main() -> int:
 
     cleaned = cleaning_result.cleaned
     report = compute_data_quality_report(cleaned, cleaning_result)
+    report["source_sha256"] = hashlib.sha256(RAW_DATA_PATH.read_bytes()).hexdigest()
     QUALITY_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     QUALITY_REPORT_PATH.write_text(
         render_quality_report_markdown(report, RAW_DATA_PATH), encoding="utf-8"

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/models", tags=["models"])
 
 
 @router.get("/active", response_model=ActiveModelResponse)
-async def get_active_model(
+def get_active_model(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActiveModelResponse:
     """Return metadata for the model artifact currently serving predictions.

@@ -48,7 +48,6 @@ class Loan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     interest_rate: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
-    term_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     purpose: Mapped[LoanIntent] = mapped_column(
         Enum(LoanIntent, name="loan_intent_enum"),
         nullable=False,

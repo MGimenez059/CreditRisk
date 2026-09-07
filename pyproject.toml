@@ -14,11 +14,9 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
-    "polars>=1.12",
     "pandas>=2.2",
     "numpy>=2.1",
     "pyarrow>=17.0",
-    "duckdb>=1.1",
     "xgboost>=2.1",
     "scikit-learn>=1.5",
     "shap>=0.46",
@@ -39,7 +37,8 @@ dev = [
     "pandas-stubs>=2.2",
 ]
 viz = [
-    "plotly>=5.24",
+    "matplotlib>=3.9",
+    "ipykernel>=6.29",
 ]
 
 [build-system]
@@ -104,9 +103,8 @@ plugins = ["pydantic.mypy"]
 exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
-# sklearn/joblib lack type stubs; shap/xgboost/optuna/duckdb aren't imported
-# yet (roadmap Phases 3-5) but are pre-declared here for when they are.
-module = ["sklearn.*", "joblib.*", "shap.*", "xgboost.*", "optuna.*", "duckdb.*"]
+# These imported libraries do not provide the typing metadata MyPy needs.
+module = ["sklearn.*", "joblib.*"]
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------
@@ -119,7 +117,7 @@ testpaths = ["tests"]
 pythonpath = ["src", "scripts"]
 asyncio_mode = "auto"
 markers = [
-    "unit: fast, no I/O tests",
+    "unit: isolated tests without live database or network dependencies",
     "integration: tests requiring a database or external services",
 ]
 

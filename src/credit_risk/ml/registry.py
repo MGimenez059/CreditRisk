@@ -3,14 +3,14 @@
 An "artifact" is the full inference pipeline (preprocessing + feature
 engineering + model) serialized as a single `joblib` file, paired with a
 JSON metadata sidecar of the same name — per CODESTYLE.md §14, this makes
-training-serving skew structurally impossible and keeps every artifact
+the transformation contract testable and keeps every artifact
 traceable to the data and code that produced it.
 
 This module has no FastAPI or database dependency, per CODESTYLE.md §3.
 """
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -41,6 +41,8 @@ class ModelArtifactMetadata:
     feature_version: str
     metrics: dict[str, float]
     trained_at: datetime
+    python_version: str = "unknown"
+    dependency_versions: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

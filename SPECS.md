@@ -1,1715 +1,316 @@
 # CreditRisk — Technical Specification
 
+Status is tracked in [ROADMAP.md](ROADMAP.md). Section numbers are retained for existing code references.
+
 ## 1. Project Overview
 
-**CreditRisk** is an end-to-end machine learning system for estimating the probability that a borrower will default on a loan.
-
-The project is designed as a portfolio-grade **Data Science / ML Engineering / Backend** project rather than a standalone notebook.
-
-### Primary goals
-
-- Build a reproducible data ingestion and preprocessing pipeline.
-- Perform exploratory data analysis and data quality checks.
-- Engineer predictive features from borrower and loan data.
-- Train and compare baseline and tree-based classification models.
-- Use **XGBoost** as the primary production model.
-- Evaluate discrimination, calibration, and business-relevant metrics.
-- Explain individual predictions with **SHAP**.
-- Persist application data and model metadata in PostgreSQL.
-- Expose predictions through a FastAPI REST API.
-- Support single and batch predictions.
-- Containerize the system with Docker.
-- Automate testing and quality checks with GitHub Actions.
-- Maintain a clean Git history showing incremental development.
-
-### Non-goals for MVP
-
-- Real financial institution integration.
-- Real customer PII.
-- Automated loan approval.
-- Real monetary lending decisions.
-- Production-grade authentication/billing/multi-tenancy.
-- Training directly from arbitrary user-uploaded datasets.
-
----
-
-# 2. High-Level Architecture
-
-```text
-                    ┌────────────────────┐
-                    │   Public Dataset   │
-                    │  CSV / Parquet     │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ Data Validation     │
-                    │ + Profiling         │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ Feature Engineering│
-                    │ + Preprocessing     │
-                    └─────────┬──────────┘
-                              │
-                    ┌─────────┴─────────┐
-                    ▼                   ▼
-          ┌─────────────────┐   ┌─────────────────┐
-          │ Training        │   │ Evaluation      │
-          │ XGBoost         │   │ Metrics         │
-          └────────┬────────┘   └────────┬────────┘
-                   │                     │
-                   └──────────┬──────────┘
-                              ▼
-                    ┌────────────────────┐
-                    │ Model Artifact      │
-                    │ + Metadata          │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ FastAPI             │
-                    │ Prediction Service  │
-                    └───────┬───────┬────┘
-                            │       │
-                 ┌──────────┘       └──────────┐
-                 ▼                             ▼
-        ┌─────────────────┐           ┌─────────────────┐
-        │ PostgreSQL      │           │ Web Dashboard   │
-        │ Customers       │           │ Analytics       │
-        │ Loans           │           │ Predictions     │
-        │ Predictions     │           │ Explanations    │
-        └─────────────────┘           └─────────────────┘
-```
-
----
-
-# 3. Proposed Technology Stack
-
-## Backend
-
-- Python 3.12+
-- FastAPI
-- Pydantic v2
-- SQLAlchemy 2.x
-- Alembic
-- PostgreSQL
-- Uvicorn
-
-## Data
-
-- Polars
-- Pandas where ecosystem compatibility requires it
-- NumPy
-- PyArrow
-- DuckDB for analytical/local data exploration when useful
-
-## Machine Learning
-
-- XGBoost
-- scikit-learn
-- SHAP
-- Optuna for hyperparameter optimization
-- joblib for model artifact serialization
-
-## Visualization
-
-- Plotly
-- Optional frontend: React + TypeScript
-
-## Quality / Tooling
-
-- Pytest
-- Ruff
-- MyPy
-- pre-commit
-- GitHub Actions
-
-## Infrastructure
-
-- Docker
-- Docker Compose
-- PostgreSQL container
-- FastAPI container
-
-## Optional later additions
-
-- MLflow for experiment tracking
-- Redis + Celery/RQ for asynchronous batch jobs
-- MinIO/S3-compatible storage for model artifacts
-- Prometheus/Grafana for observability
-
----
-
-# 4. Repository Structure
-
-```text
-credit-risk/
-│
-├── src/
-│   └── credit_risk/
-│       ├── __init__.py
-│       │
-│       ├── api/
-│       │   ├── __init__.py
-│       │   ├── dependencies.py
-│       │   └── routes/
-│       │       ├── health.py
-│       │       ├── predictions.py
-│       │       ├── customers.py
-│       │       └── models.py
-│       │
-│       ├── config/
-│       │   ├── __init__.py
-│       │   └── settings.py
-│       │
-│       ├── db/
-│       │   ├── __init__.py
-│       │   ├── base.py
-│       │   ├── session.py
-│       │   └── models/
-│       │       ├── customer.py
-│       │       ├── loan.py
-│       │       ├── prediction.py
-│       │       └── model.py
-│       │
-│       ├── schemas/
-│       │   ├── customer.py
-│       │   ├── loan.py
-│       │   ├── prediction.py
-│       │   └── model.py
-│       │
-│       ├── repositories/
-│       │   ├── customer.py
-│       │   ├── loan.py
-│       │   ├── prediction.py
-│       │   └── model.py
-│       │
-│       ├── services/
-│       │   ├── prediction_service.py
-│       │   ├── risk_service.py
-│       │   └── explanation_service.py
-│       │
-│       ├── ml/
-│       │   ├── preprocessing.py
-│       │   ├── features.py
-│       │   ├── train.py
-│       │   ├── evaluate.py
-│       │   ├── predict.py
-│       │   ├── explain.py
-│       │   └── registry.py
-│       │
-│       └── main.py
-│
-├── data/
-│   ├── raw/
-│   ├── interim/
-│   └── processed/
-│
-├── models/
-│   └── .gitkeep
-│
-├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_feature_engineering.ipynb
-│   └── 03_model_analysis.ipynb
-│
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── fixtures/
-│
-├── scripts/
-│   ├── ingest_data.py
-│   ├── train_model.py
-│   └── evaluate_model.py
-│
-├── alembic/
-├── docs/
-│   ├── model_card.md
-│   ├── data_dictionary.md
-│   └── architecture.md
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
-├── docker/
-│   └── ...
-│
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-├── .env.example
-├── .gitignore
-├── README.md
-└── SPECS.md
-```
-
----
-
-# 5. Data Source
-
-## Initial source
-
-The initial model will use a **public, anonymized credit-risk dataset**.
-
-The exact dataset must be selected before implementation begins.
-
-### Dataset requirements
-
-The dataset should contain:
-
-- borrower demographic information
-- income information
-- employment information
-- loan information
-- credit history variables
-- a binary default/loan-status target
-- enough records to support train/validation/test splits
-- no direct PII
-
-### Candidate sources
-
-- Kaggle
-- UCI Machine Learning Repository
-- OpenML
-- Public academic datasets
-- Public LendingClub-derived datasets where licensing and availability permit
-
-### Data provenance
-
-The repository must document:
-
-```text
-Source:
-Dataset:
-Version:
-Download date:
-License:
-Original URL:
-Number of records:
-Target variable:
-Known limitations:
-```
-
-The raw dataset must **not** be committed to Git if its license or size makes that inappropriate.
-
----
-
-# 6. Canonical Data Model
-
-The application will maintain an internal relational model independent from the original dataset schema.
-
-## Customer
-
-```text
-customers
----------
-id UUID PK
-age INTEGER
-income NUMERIC
-employment_years NUMERIC
-home_ownership VARCHAR
-created_at TIMESTAMP
-updated_at TIMESTAMP
-```
-
-## Loan
-
-```text
-loans
------
-id UUID PK
-customer_id UUID FK
-amount NUMERIC
-interest_rate NUMERIC
-term_months INTEGER
-purpose VARCHAR
-grade VARCHAR NULL
-loan_status INTEGER
-created_at TIMESTAMP
-```
-
-## Credit History
-
-```text
-credit_histories
-----------------
-id UUID PK
-customer_id UUID FK
-credit_history_years NUMERIC
-late_payments INTEGER
-previous_defaults INTEGER
-credit_utilization NUMERIC
-active_credit_lines INTEGER
-created_at TIMESTAMP
-```
-
-## Prediction
-
-```text
-predictions
------------
-id UUID PK
-customer_id UUID NULL
-model_id UUID FK
-default_probability NUMERIC
-risk_score INTEGER
-risk_level VARCHAR
-prediction_version VARCHAR
-created_at TIMESTAMP
-```
-
-## Model
-
-```text
-models
-------
-id UUID PK
-name VARCHAR
-version VARCHAR
-algorithm VARCHAR
-training_dataset VARCHAR
-roc_auc NUMERIC
-pr_auc NUMERIC
-f1 NUMERIC
-brier_score NUMERIC NULL
-artifact_path VARCHAR
-is_active BOOLEAN
-created_at TIMESTAMP
-```
-
----
-
-# 7. Target Variable
-
-Primary target:
-
-```text
-loan_status
-```
-
-Binary classification:
-
-```text
-0 = No default
-1 = Default
-```
-
-The exact mapping must be verified against the selected dataset.
-
-The target must never be included as a model feature.
-
----
-
-# 8. Feature Engineering
-
-Initial feature groups:
-
-## Borrower features
-
-- age
-- income
-- employment years
-- home ownership
-
-## Loan features
-
-- loan amount
-- interest rate
-- term
-- loan purpose
-- grade
-
-## Credit history
-
-- credit history length
-- previous defaults
-- late payments
-- credit utilization
-- active credit lines
-
-## Derived features
-
-Examples:
-
-```text
-loan_to_income =
-    loan_amount / income
-
-debt_to_income =
-    total_debt / income
-
-income_per_employment_year =
-    income / max(employment_years, 1)
-
-credit_age_ratio =
-    credit_history_years / max(age, 1)
-
-late_payment_rate =
-    late_payments / max(credit_history_length, 1)
-```
-
-Feature engineering must be implemented as reusable Python code rather than only notebook cells.
-
----
-
-# 9. Data Leakage Prevention
-
-This is a critical requirement.
-
-The following rules must be enforced:
-
-1. Split data before fitting transformations that learn parameters.
-2. Fit preprocessing only on the training set.
-3. Never use post-loan outcome information as a feature.
-4. Never include the target or target-derived variables.
-5. Avoid features that would only be available after the credit decision.
-6. Keep train/validation/test datasets isolated.
-7. Document suspicious features during EDA.
-
-The final pipeline should use scikit-learn-compatible transformers where possible.
-
----
-
-# 10. Dataset Splitting
-
-Default split:
-
-```text
-Train       70%
-Validation  15%
-Test        15%
-```
-
-For classification:
-
-```python
-train_test_split(
-    X,
-    y,
-    test_size=0.30,
-    stratify=y,
-    random_state=42,
-)
-```
-
-The final test set must remain untouched until model selection is complete.
-
-If the selected dataset contains meaningful temporal information, a **time-based split** should be preferred over a random split.
-
----
-
-# 11. Class Imbalance
-
-Credit default datasets commonly contain fewer defaults than non-defaults.
-
-The project must explicitly measure:
-
-```text
-positive_rate
-negative_rate
-class_ratio
-```
-
-Potential strategies:
-
-- `scale_pos_weight`
-- class weights
-- threshold optimization
-- stratified cross-validation
-
-Oversampling techniques such as SMOTE are optional and must only be applied inside the training pipeline to avoid leakage.
-
----
-
-# 12. Baseline Models
-
-Before XGBoost, train simple baselines.
-
-Required:
-
-### Logistic Regression
-
-Purpose:
-
-- interpretable baseline
-- sanity check
-- comparison against nonlinear model
-
-Optional:
-
-### Random Forest
-
-Purpose:
-
-- tree-based baseline
-- compare ensemble performance
-
-The final report must compare all models using the same validation protocol.
-
----
-
-# 13. Primary Model — XGBoost
-
-Primary algorithm:
-
-```python
-XGBClassifier
-```
-
-Initial configuration should prioritize reproducibility.
-
-Example starting parameters:
-
-```python
-XGBClassifier(
-    objective="binary:logistic",
-    eval_metric="logloss",
-    n_estimators=300,
-    max_depth=5,
-    learning_rate=0.05,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    random_state=42,
-)
-```
-
-These values are starting points, not final values.
-
-The final configuration must be selected using validation data/cross-validation.
-
----
+CreditRisk is an educational portfolio project spanning Data Science, ML Engineering
+and Backend. Build a reproducible default-classification workflow and serve an
+evaluated model with explanations. Non-goals: real lending decisions, direct PII,
+automated approvals, arbitrary uploaded training data, authentication/billing and
+multi-tenancy. XGBoost is a candidate; model selection remains evidence-based.
 
-# 14. Hyperparameter Optimization
+## 2. High-Level Architecture
 
-Use **Optuna** after a stable baseline exists.
+Validated dataset -> grouped split -> complete training pipeline -> evaluation
+-> artifact/metadata -> FastAPI -> explanations -> PostgreSQL predictions.
+See [architecture](docs/architecture.md) for implemented versus pending behavior.
 
-Candidate parameters:
+## 3. Proposed Technology Stack
 
-```text
-n_estimators
-max_depth
-learning_rate
-min_child_weight
-subsample
-colsample_bytree
-gamma
-reg_alpha
-reg_lambda
-```
+Python 3.12 reference runtime; Pandas, NumPy, PyArrow; scikit-learn, XGBoost,
+SHAP, Optuna and joblib; FastAPI/Pydantic; SQLAlchemy/Alembic/PostgreSQL;
+Ruff/MyPy/Pytest; Docker and GitHub Actions. Matplotlib and ipykernel are optional
+notebook dependencies. Resolved dependencies live in `uv.lock`. Do not add Polars,
+DuckDB or a frontend framework without a use case.
 
-Optimization objective:
+## 4. Repository Structure
 
-```text
-Primary:
-ROC-AUC
+`src/credit_risk/` contains api, schemas, services, repositories, db, ml and config.
+`scripts/` holds ingestion, baseline and future selected-model CLIs. `tests/`,
+`notebooks/`, `docs/`, `models/` and `data/` have distinct purposes. Do not create
+placeholder directories or notebooks merely to reproduce an illustrative tree.
 
-Secondary:
-PR-AUC
-Brier Score
-F1
-Calibration
-```
+## 5. Data Source
 
-The optimization process must be reproducible with fixed seeds.
+Source: Kaggle `laotse/credit-risk-dataset`. Record source version, download date,
+license evidence and target semantics when obtaining the data. Record a content
+hash for each training input. Missing provenance must be stated as unknown, not
+replaced with invented values. See [data dictionary](docs/data_dictionary.md).
 
----
+## 6. Canonical Data Model
 
-# 15. Cross Validation
+MVP persistence stores model identity/metadata and predictions linked by model_id.
+Predictions may be anonymous. Customer, Loan and CreditHistory are optional retained
+scaffolds; they do not require CRUD endpoints or training-data ingestion into SQL.
+Unsupported bureau fields are removed. In existing storage scaffolds Loan.amount
+and Loan.purpose correspond to API loan_amount and loan_intent.
+Migrations and tested transaction boundaries are required before serving works.
 
-Default:
+## 7. Target Variable
 
-```text
-StratifiedKFold
-n_splits = 5
-shuffle = True
-random_state = 42
-```
+`loan_status`: 0 = no default, 1 = default. This is the local target convention;
+verify the source definition and observation horizon. Never include target values
+or target-derived information in inputs.
 
-For each fold record:
+## 8. Feature Engineering
 
-- ROC-AUC
-- PR-AUC
-- F1
-- precision
-- recall
-- log loss
+Use the nine source fields in `ml.preprocessing.RAW_FEATURE_COLUMNS`.
+The serialized pipeline derives loan_to_income, income_per_employment_year and
+credit_age_ratio, then preprocesses and classifies. Income must be positive.
+Retain missing employment/rate for training-only imputation. Exclude source
+loan_percent_income in favor of the recomputed ratio; rounding may differ.
+No debt_to_income or late_payment_rate without actual source information.
 
-Report:
+## 9. Data Leakage Prevention
 
-```text
-mean ± standard deviation
-```
+Split before fitting imputers, encoders, scalers or models. Group identical raw
+model inputs across all partitions and CV folds. Fit learned transformations only
+on training rows. Exclude outcome information and verify feature availability at
+prediction time. Grade is conservatively excluded; correlation alone does not prove
+leakage. Review interest rate as well. Historical EDA used the full dataset; record
+that limitation rather than calling the holdout completely unseen.
 
----
+## 10. Dataset Splitting
 
-# 16. Model Evaluation
+Split raw-input groups 70% train, 15% validation, 15% test with random_state=42.
+Groups use identical values in the nine model-input columns, excluding labels.
+Stratify by group-majority target; positive wins ties. Keep all group members,
+including conflicting outcomes, in one partition. Report actual row sizes and
+development class balance because group sizes differ. Save positional assignments
+with the exact input hash. No final test scoring before model selection is frozen.
+Use temporal validation instead if a future dataset supports it.
 
-Accuracy must **not** be the primary metric.
+## 11. Class Imbalance
 
-Required metrics:
+Measure positive_rate, negative_rate and class_ratio. Both Phase 3 baselines
+start with class_weight="balanced". Compare weighting against unweighted models
+in Phase 4, especially for probability quality. Threshold optimization is model
+agnostic; scale_pos_weight is an XGBoost option. Sampling is not required.
 
-## ROC-AUC
+## 12. Baseline Models
 
-Measures ranking/discrimination across thresholds.
+Train Logistic Regression and Random Forest using the same split/preprocessing
+protocol. Save artifacts, parameters and validation results through
+`scripts/train_baselines.py`. A real-data rerun is required after changing splits;
+historical numbers must not be reused as new-protocol results.
 
-## PR-AUC
+## 13. Candidate Model — XGBoost
 
-Especially useful under class imbalance.
+Train XGBClassifier as the next candidate, with a fixed seed and a modest initial
+configuration. Compare against both baselines; choose the best justified model,
+considering discrimination, probability quality and complexity. Do not require
+XGBoost to win to satisfy the project goal.
 
-## Precision
+## 14. Hyperparameter Optimization
 
-Of predicted defaults, how many were actually defaults?
+Use a seeded Optuna sampler after a stable XGBoost baseline. Set an explicit trial
+budget and tune a small justified parameter space. Primary objective: ROC-AUC;
+report average precision and probability metrics as secondary evidence. Do not
+optimize against the test set.
 
-## Recall
+## 15. Cross Validation
 
-Of actual defaults, how many did the model identify?
+Use group-aware stratified CV on development data, preserving the Phase 3 grouping.
+Start with five folds when group/class counts allow. Fit preprocessing inside each
+fold. Report mean and standard deviation for discrimination/probability metrics;
+threshold metrics must state the threshold. Ordinary StratifiedKFold alone does
+not protect duplicate groups.
 
-## F1
+## 16. Model Evaluation
 
-Harmonic mean of precision and recall.
+Report ROC-AUC, average precision (`pr_auc` = average_precision_score), precision,
+recall, F1, log loss and Brier score. State threshold and evaluated partition.
+Inspect a calibration curve in Phase 4. Brier score is overall probability error,
+not a standalone proof of calibration. Accuracy is not the primary metric.
 
-## Log Loss
+## 17. Decision Threshold
 
-Measures quality of predicted probabilities.
+Use 0.5 for comparable baseline F1/precision/recall. In Phase 4 state a portfolio
+demo objective, compare thresholds on development data and freeze the chosen value
+before final test scoring. No claim that an arbitrary threshold is a lending policy.
 
-## Brier Score
+## 18. Risk Score
 
-Measures probabilistic accuracy/calibration.
+`risk_score = round(default_probability * 100)`. Classify the rounded score:
+0–30 LOW, 31–70 MEDIUM, 71–100 HIGH. These illustrative display bands are independent
+of the classification threshold and are not an industry credit score.
 
-## Calibration Curve
+## 19. Explainability — SHAP
 
-Compare predicted probability against observed default frequency.
+Phase 5: global importance, summary plot and local contributions. Define SHAP
+output space, base value, encoded-feature aggregation and additivity checks.
+XGBoost raw values are log-odds; do not label them probability increments.
+If calibration is used, state whether the explanation describes the base estimator
+or calibrated predictor. Finalize the response schema against that decision.
 
----
+## 20. Prediction API
 
-# 17. Decision Threshold
+Root liveness: GET /health. Under `/api/v1`: GET /models/active, POST /predictions
+and POST /predictions/batch. See README for a request using only supported fields.
+Batch input is a JSON array; output wraps predictions in `results`.
+Results identify the actual artifact's name/version. Customer CRUD is outside MVP.
+The current route scaffolds do not mean operational inference is complete.
 
-The default classification threshold of `0.5` must not automatically be considered optimal.
+## 21. API Validation
 
-The system should support:
+Reject unknown fields and non-finite numbers. Require age 18–100, positive income
+and loan amount, known categories, non-negative credit history and previous_defaults
+as a required 0/1 flag. Employment duration 0–70 and rate 0–100 may be explicitly null.
+Invalid requests return HTTP 422. Keep raw-input and serving constraints consistent.
 
-```text
-threshold = 0.50
-```
+## 22. Database Layer
 
-as a baseline and evaluate alternatives.
+SQLAlchemy queries belong in repositories. Services orchestrate writes and may use
+ORM entities internally; HTTP responses use schemas. Use Alembic, indexed foreign
+keys and database constraints. Add tested transactions before completing Phase 6.
 
-Example:
+## 23. ML Service Architecture
 
-```text
-Threshold  Precision  Recall
-0.30       0.41       0.82
-0.40       0.49       0.75
-0.50       0.57       0.66
-0.60       0.65       0.54
-0.70       0.72       0.43
-```
+Request -> service -> API-to-source mapping -> full saved pipeline -> probability
+-> display score -> explanation -> persistence -> response. ML code has no FastAPI
+or database dependency. Use synchronous routes for the synchronous service stack.
 
-The final threshold should be selected based on the project's stated business objective.
+## 24. Model Artifact
 
----
+Serialize feature engineering + preprocessing + estimator together in joblib.
+Use a JSON sidecar with name/version, algorithm, input snapshot, feature version,
+metrics, training timestamp and runtime/dependency versions. Confirm save/load
+preserves raw-input predictions through a regression test.
 
-# 18. Risk Score
+## 25. Model Versioning
 
-Convert predicted probability into a portfolio-friendly score.
+Every deployed artifact has a name/version and immutable provenance. Store the
+model_id/version with predictions. An artifact version identifies the model but
+does not reconstruct a historical request without its input. Do not overclaim
+replayability of anonymous predictions whose inputs are not retained.
 
-Initial MVP:
+## 26. Experiment Tracking
 
-```text
-risk_score = round(default_probability * 100)
-```
+Use local JSON run manifests and reviewed evaluation reports. Record snapshot hash,
+seed, feature schema, parameters, split assignments, environment and artifacts.
+MLflow is optional post-MVP; no database experiment-tracking service is needed now.
 
-Risk levels:
+## 27. Testing Strategy
 
-```text
-0–30   LOW
-31–70  MEDIUM
-71–100 HIGH
-```
+Unit tests cover data cleaning, transformations, grouped splits, raw-input artifact
+round trips, API mapping, validation and metrics. Use tmp_path for isolated file I/O.
+Integration tests must cover serving plus a dedicated PostgreSQL database before
+the API is declared operational. Test meaningful boundaries and failure paths.
 
-This is a presentation layer and should not be confused with an industry-standard credit score.
+## 28. Data Validation
 
----
+Validate columns/types/nulls/categories/ranges. Structural errors stop ingestion.
+Configured row violations are excluded with reasons; more than 5% exclusions stop
+the pipeline. Preserve ordinary statistical outliers unless justified otherwise.
+Report duplicates and enforce partition isolation when splitting. Undefined ratios
+(non-positive income) fail model feature construction instead of creating infinities.
 
-# 19. Explainability — SHAP
+## 29. Data Quality Report
 
-Use SHAP for model interpretation.
+Generate counts, missingness, duplicate count, numerical/categorical distributions,
+target distribution, unique values, outliers and a numeric correlation screen.
+Label the screen's limits: it does not check categorical leakage or feature timing.
+Published reports identify their snapshot/status and are not manually fabricated.
 
-Required outputs:
+## 30. Reproducibility
 
-### Global explanation
+Use the committed uv.lock and Python 3.12 reference environment. Record runtime
+versions and the input content hash per run. `scripts/train_baselines.py` must work
+after environment setup and ingestion with no notebook execution. Record split
+positions and report actual sizes. Reproducibility requires more than a seed.
 
-- mean absolute SHAP importance
-- feature ranking
-- summary plot
+## 31. Docker
 
-### Local explanation
+Compose provides PostgreSQL, a migration command and the API. Build success is
+not a prediction smoke test. Real Alembic revisions and a compatible model/explainer
+are required for an operational demo. No frontend container required.
 
-For an individual prediction:
+## 32. Environment Variables
 
-```text
-default_probability = 0.73
+Use `.env.example` as the environment variable reference. `db` is the Compose
+hostname; use `localhost` for a local Python process. MODEL_PATH selects the loaded
+artifact. Do not duplicate model identity from config when artifact metadata exists.
 
-Top contributors:
+## 33. Logging
 
-debt_to_income       +0.21
-late_payments        +0.14
-credit_utilization   +0.08
-income               -0.06
-employment_years     -0.04
-```
+Use structured logs for startup, model loading, errors and inference latency/model
+version, with request correlation. Never log full applicant payloads or credentials.
+CLI progress/errors may use stdout/stderr. Complete request-wide tracing in Phase 7.
 
-The API should return machine-readable explanation data.
+## 34. Observability
 
----
+MVP observability is structured logs, correlation, latency and meaningful readiness
+checks. Current /health is liveness only. Advanced telemetry is optional post-MVP.
 
-# 20. Prediction API
+## 35. Model Monitoring — Future
 
-Base URL:
+Data/prediction drift and performance monitoring need a sustained serving use case
+and actual outcome availability. They are not Phase 3 or MVP requirements.
 
-```text
-/api/v1
-```
+## 36. Security / Privacy
 
-## Health
+Use public non-identifying data and synthetic examples. Do not commit credentials
+or direct personal identifiers. Public data does not establish synthetic origin.
+Authentication, rate limits and deployment hardening are future deployment work,
+not an excuse to claim the demo is production-ready.
 
-```http
-GET /health
-```
+## 37. Ethical / Responsible ML
 
-Response:
+State educational use, uncertain representativeness, potential bias and absence
+of real-world/compliance validation. Review sensitive/proxy features before portfolio
+sign-off; category correlations cannot prove fairness. No real creditworthiness claims.
 
-```json
-{
-  "status": "ok"
-}
-```
+## 38. Model Card
 
-## Model information
+Maintain docs/model_card.md with purpose, data/provenance, features, protocol,
+model selection, metrics, runtime, limitations and bias considerations. Clearly
+separate historical results, current verified results and pending work.
 
-```http
-GET /models/active
-```
+## 39. CI/CD
 
-Response:
+GitHub Actions installs the locked environment, checks Ruff formatting/lint, runs
+MyPy/Pytest and builds Docker only after quality passes. Database integration tests
+are added with Phase 6. Automated deployment is not currently implemented.
 
-```json
-{
-  "name": "credit-risk-xgboost",
-  "version": "1.0.0",
-  "algorithm": "XGBoost",
-  "roc_auc": 0.82
-}
-```
+## 40. Git Strategy
 
-## Single prediction
+Use focused changes, English Conventional Commits and reviewable descriptions.
+Do not manufacture commit history or claim a check ran when it did not.
 
-```http
-POST /predictions
-```
+## 41. Development Milestones Reference
 
-Request:
+Phase status lives only in [ROADMAP.md](ROADMAP.md). Do not duplicate phase checklists here.
 
-```json
-{
-  "age": 34,
-  "income": 1450000,
-  "employment_years": 6,
-  "home_ownership": "RENT",
-  "loan_amount": 500000,
-  "interest_rate": 12.5,
-  "term_months": 36,
-  "loan_intent": "PERSONAL",
-  "credit_history_years": 7,
-  "late_payments": 1,
-  "previous_defaults": 0,
-  "credit_utilization": 0.42,
-  "active_credit_lines": 4
-}
-```
+## 42. MVP Definition
 
-Response:
+Reproducible ingestion/training, a justified selected model, documented evaluation,
+SHAP, a working FastAPI prediction endpoint, PostgreSQL prediction/model persistence,
+tests, Docker, CI and documentation. No frontend, customer CRUD or production deployment required.
 
-```json
-{
-  "default_probability": 0.183,
-  "risk_score": 18,
-  "risk_level": "LOW",
-  "model": {
-    "name": "credit-risk-xgboost",
-    "version": "1.0.0"
-  },
-  "explanation": [
-    {
-      "feature": "debt_to_income",
-      "impact": 0.18,
-      "direction": "positive"
-    }
-  ]
-}
-```
+## 43. Definition of Done
 
-## Batch prediction
+See the Definition of Done in ROADMAP.md. Code existence and scaffolds are not
+execution evidence. Pending real-data or integration validation remains explicit.
 
-```http
-POST /predictions/batch
-```
+## 44. Suggested First Dataset Schema
 
-Input:
+The chosen dataset and `RAW_FEATURE_COLUMNS` determine the actual schema, documented
+in the data dictionary. Do not impose a generic credit-bureau schema or impute
+entirely unavailable fields.
 
-- JSON array initially
-- CSV upload in later version
+## 45. Success Criteria
 
-Output:
+Demonstrate sound data handling, leakage-aware evaluation, reproducible artifacts,
+model comparison, explanations and maintainable serving. Additional infrastructure
+does not compensate for missing evaluation or a non-working prediction path.
 
-- predictions
-- probabilities
-- risk levels
-- model version
+## 46. Long-Term Architecture
 
----
+Optional extensions are listed once in ROADMAP.md. Add infrastructure only when
+an actual requirement justifies it; no speculative feature-store architecture.
 
-# 21. API Validation
+## 47. Guiding Principle
 
-Pydantic must validate:
-
-- non-negative income
-- positive loan amount
-- valid age range
-- valid categorical values
-- reasonable employment duration
-- probability range
-- valid UUIDs
-- required fields
-
-Invalid requests must return HTTP 422.
-
----
-
-# 22. Database Layer
-
-Use:
-
-- SQLAlchemy 2.x
-- PostgreSQL
-- Alembic
-
-Requirements:
-
-- typed ORM models
-- repository/service separation
-- migrations
-- transactions
-- indexes on foreign keys
-- database constraints where appropriate
-
-Do not put raw SQL throughout API route handlers.
-
----
-
-# 23. ML Service Architecture
-
-Prediction flow:
-
-```text
-FastAPI endpoint
-      ↓
-Pydantic validation
-      ↓
-Prediction service
-      ↓
-Feature builder
-      ↓
-Preprocessing pipeline
-      ↓
-XGBoost model
-      ↓
-Probability
-      ↓
-Risk score
-      ↓
-SHAP explanation
-      ↓
-Persist prediction
-      ↓
-API response
-```
-
-The FastAPI layer must not contain model implementation details.
-
----
-
-# 24. Model Artifact
-
-The model artifact must contain the complete inference pipeline where practical:
-
-```text
-preprocessing
-+
-feature engineering
-+
-model
-```
-
-Possible artifact:
-
-```text
-models/
-└── credit_risk_xgboost_v1.joblib
-```
-
-Metadata:
-
-```json
-{
-  "model_name": "credit-risk-xgboost",
-  "version": "1.0.0",
-  "algorithm": "XGBoost",
-  "training_date": "YYYY-MM-DD",
-  "dataset_version": "v1",
-  "roc_auc": 0.82,
-  "pr_auc": 0.65
-}
-```
-
----
-
-# 25. Model Versioning
-
-Every deployed model must have:
-
-```text
-model name
-version
-training dataset version
-feature version
-metrics
-training timestamp
-artifact location
-```
-
-Example:
-
-```text
-credit-risk-xgboost:v1.0.0
-credit-risk-xgboost:v1.1.0
-```
-
-Predictions must store the model version used.
-
-This makes historical predictions reproducible.
-
----
-
-# 26. Experiment Tracking
-
-MVP:
-
-- store experiments in structured files/JSON
-- commit configuration
-- save evaluation reports
-
-Later:
-
-- integrate MLflow
-
-Each experiment should record:
-
-```text
-experiment_id
-model
-hyperparameters
-features
-dataset version
-metrics
-random seed
-artifact
-timestamp
-```
-
----
-
-# 27. Testing Strategy
-
-## Unit tests
-
-Test:
-
-- feature engineering
-- validation
-- risk scoring
-- preprocessing
-- prediction service
-- repository methods
-
-Example:
-
-```text
-test_risk_score_low()
-test_risk_score_medium()
-test_risk_score_high()
-test_invalid_income()
-test_feature_engineering()
-```
-
-## Integration tests
-
-Test:
-
-```text
-FastAPI
-    ↓
-Service
-    ↓
-Database
-```
-
-Use a dedicated test database/container.
-
-## ML tests
-
-At minimum:
-
-- pipeline can train
-- model produces probability in `[0, 1]`
-- prediction schema is stable
-- feature columns match training schema
-- no unexpected NaNs reach inference
-
----
-
-# 28. Data Validation
-
-Before training, validate:
-
-- required columns
-- dtypes
-- null percentages
-- duplicate rows
-- invalid categorical values
-- impossible numerical values
-- target distribution
-- feature ranges
-
-A validation failure must stop the pipeline rather than silently corrupting data.
-
----
-
-# 29. Data Quality Report
-
-Generate a report containing:
-
-```text
-Rows
-Columns
-Missing values
-Duplicates
-Unique values
-Numerical distributions
-Categorical distributions
-Target distribution
-Potential outliers
-Potential leakage
-```
-
-This report should be versioned as part of the project documentation, not necessarily committed for every dataset execution.
-
----
-
-# 30. Reproducibility
-
-All training runs must define:
-
-```text
-random_state = 42
-```
-
-The repository must specify:
-
-- Python version
-- dependency versions
-- dataset version
-- model version
-- feature version
-
-A fresh clone should be able to reproduce the baseline training run.
-
----
-
-# 31. Docker
-
-Services:
-
-```text
-app
-db
-```
-
-Optional later:
-
-```text
-frontend
-mlflow
-redis
-worker
-```
-
-Example:
-
-```text
-docker compose up --build
-```
-
-The application should start with:
-
-```text
-FastAPI → PostgreSQL
-```
-
-and run database migrations automatically or through an explicit migration command.
-
----
-
-# 32. Environment Variables
-
-`.env.example`:
-
-```env
-APP_ENV=development
-
-DATABASE_URL=postgresql+psycopg://creditrisk:creditrisk@db:5432/creditrisk
-
-MODEL_PATH=models/credit_risk_xgboost_v1.joblib
-
-LOG_LEVEL=INFO
-```
-
-Secrets must never be committed.
-
----
-
-# 33. Logging
-
-Use structured application logging.
-
-Log:
-
-- startup
-- database connection
-- model loading
-- prediction request ID
-- prediction latency
-- model version
-- errors
-
-Never log sensitive customer information.
-
----
-
-# 34. Observability
-
-MVP:
-
-- structured logs
-- request IDs
-- prediction latency
-
-Later:
-
-- Prometheus metrics
-- Grafana dashboard
-- model drift monitoring
-
-Potential metrics:
-
-```text
-prediction_count
-prediction_latency
-model_error_count
-risk_distribution
-```
-
----
-
-# 35. Model Monitoring — Future
-
-Monitor:
-
-## Data drift
-
-Compare production feature distributions against training distributions.
-
-## Prediction drift
-
-Monitor changes in:
-
-```text
-LOW / MEDIUM / HIGH
-```
-
-distribution.
-
-## Performance drift
-
-If actual outcomes become available, calculate:
-
-- ROC-AUC
-- PR-AUC
-- calibration
-- recall
-- precision
-
-over time.
-
----
-
-# 36. Security / Privacy
-
-The project must use synthetic or public anonymized data.
-
-Never include:
-
-- names
-- addresses
-- phone numbers
-- email addresses
-- government IDs
-- bank account numbers
-- real financial records
-
-API input must be treated as untrusted.
-
-Production deployment should eventually include:
-
-- authentication
-- rate limiting
-- HTTPS
-- secret management
-- audit logging
-
----
-
-# 37. Ethical / Responsible ML
-
-Credit risk is a **high-impact domain**.
-
-The project is educational/portfolio-oriented and must not claim to be suitable for real-world lending decisions.
-
-The README and model card should explicitly state:
-
-- dataset limitations
-- potential bias
-- absence of real-world validation
-- lack of regulatory/compliance review
-- model uncertainty
-- intended educational/research use
-
-Potentially sensitive/proxy features must be reviewed carefully.
-
-Do not claim that a prediction represents a person's actual creditworthiness.
-
----
-
-# 38. Model Card
-
-Create:
-
-```text
-docs/model_card.md
-```
-
-Include:
-
-```text
-Model name
-Version
-Purpose
-Intended use
-Out-of-scope use
-Training data
-Features
-Target
-Algorithm
-Metrics
-Limitations
-Bias considerations
-Explainability
-Reproducibility
-```
-
----
-
-# 39. CI/CD
-
-GitHub Actions pipeline:
-
-```text
-Push / Pull Request
-        ↓
-Install dependencies
-        ↓
-Ruff
-        ↓
-MyPy
-        ↓
-Pytest
-        ↓
-Build Docker image
-```
-
-Later:
-
-```text
-        ↓
-Integration tests
-        ↓
-Security scan
-        ↓
-Deploy
-```
-
-CI must fail if tests or quality checks fail.
-
----
-
-# 40. Git Strategy
-
-Commits should represent real units of work.
-
-Examples:
-
-```text
-chore: initialize project structure
-feat: add database configuration
-feat: add customer and loan models
-feat: add alembic migrations
-feat: implement dataset ingestion
-feat: add data validation
-feat: add feature engineering pipeline
-feat: train logistic regression baseline
-feat: train xgboost model
-feat: add cross validation
-feat: add model calibration
-feat: add shap explanations
-feat: implement prediction service
-feat: add prediction endpoint
-test: add prediction service tests
-feat: add batch predictions
-feat: add risk analytics endpoint
-ci: add github actions
-docs: add model card
-docs: document architecture
-```
-
-Avoid meaningless commits such as:
-
-```text
-update
-fix
-changes
-stuff
-final
-final2
-```
-
----
-
-# 41. Development Milestones
-
-## Phase 0 — Planning
-
-- [ ] Define scope
-- [ ] Select dataset
-- [ ] Document data source
-- [ ] Define target
-- [ ] Define initial features
-
-## Phase 1 — Repository
-
-- [ ] Initialize Python project
-- [ ] Configure Ruff
-- [ ] Configure Pytest
-- [ ] Configure environment
-- [ ] Create package structure
-- [ ] Create README
-
-## Phase 2 — Data
-
-- [ ] Download dataset
-- [ ] Implement ingestion
-- [ ] Validate schema
-- [ ] Generate data quality report
-- [ ] Perform EDA
-- [ ] Document data dictionary
-
-## Phase 3 — ML baseline
-
-- [ ] Create train/validation/test split
-- [ ] Build preprocessing pipeline
-- [ ] Train Logistic Regression
-- [ ] Evaluate baseline
-- [ ] Add Random Forest
-
-## Phase 4 — XGBoost
-
-- [ ] Train first XGBoost model
-- [ ] Evaluate
-- [ ] Add cross-validation
-- [ ] Tune hyperparameters
-- [ ] Compare against baselines
-- [ ] Select candidate model
-
-## Phase 5 — Explainability
-
-- [ ] Integrate SHAP
-- [ ] Global feature importance
-- [ ] Local explanations
-- [ ] Explanation API schema
-
-## Phase 6 — Backend
-
-- [ ] PostgreSQL
-- [ ] SQLAlchemy
-- [ ] Alembic
-- [ ] Customer model
-- [ ] Loan model
-- [ ] Prediction model
-- [ ] Model metadata
-- [ ] Prediction service
-- [ ] FastAPI endpoints
-
-## Phase 7 — Productionization
-
-- [ ] Docker
-- [ ] Docker Compose
-- [ ] Logging
-- [ ] Error handling
-- [ ] Health checks
-- [ ] Integration tests
-
-## Phase 8 — Dashboard
-
-- [ ] Risk distribution
-- [ ] Prediction form
-- [ ] Individual prediction
-- [ ] SHAP visualization
-- [ ] Model metrics
-- [ ] Batch predictions
-
-## Phase 9 — CI/CD
-
-- [ ] GitHub Actions
-- [ ] Lint
-- [ ] Type checking
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] Docker build
-
-## Phase 10 — Advanced
-
-- [ ] Optuna
-- [ ] MLflow
-- [ ] Model registry
-- [ ] Data drift
-- [ ] Prediction drift
-- [ ] Automated retraining pipeline
-
----
-
-# 42. MVP Definition
-
-The first usable version is complete when all of the following work:
-
-```text
-Dataset
-   ↓
-Validation
-   ↓
-Feature Engineering
-   ↓
-XGBoost
-   ↓
-Evaluation
-   ↓
-Saved Model
-   ↓
-FastAPI
-   ↓
-POST /predictions
-   ↓
-Probability + Risk Score + Explanation
-```
-
-MVP must have:
-
-- reproducible training
-- XGBoost model
-- documented evaluation
-- SHAP explanation
-- FastAPI prediction endpoint
-- PostgreSQL
-- tests
-- Docker
-- README
-
-The frontend is not required for MVP.
-
----
-
-# 43. Definition of Done
-
-A feature is considered complete when:
-
-- implementation exists
-- unit tests exist where applicable
-- type/lint checks pass
-- documentation is updated
-- no secrets are committed
-- code follows project architecture
-- behavior is reproducible
-- Git commit clearly describes the change
-
----
-
-# 44. Suggested First Dataset Schema
-
-If the selected public dataset provides compatible fields, normalize them toward:
-
-```text
-age
-income
-employment_years
-home_ownership
-loan_amount
-interest_rate
-term_months
-loan_intent
-loan_grade
-loan_percent_income
-credit_history_years
-previous_default
-late_payments
-credit_utilization
-active_credit_lines
-loan_status
-```
-
-Do not force this schema if the chosen dataset does not contain the required information. The final feature set must be based on actual available data.
-
----
-
-# 45. Success Criteria
-
-The project is successful when it demonstrates all of the following:
-
-### Data Science
-
-- meaningful EDA
-- robust preprocessing
-- feature engineering
-- class imbalance handling
-- appropriate evaluation metrics
-
-### Machine Learning
-
-- baseline comparison
-- XGBoost
-- hyperparameter tuning
-- probability calibration
-- SHAP explainability
-
-### Backend
-
-- FastAPI
-- Pydantic
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- service/repository architecture
-
-### Engineering
-
-- tests
-- Docker
-- CI
-- logging
-- reproducibility
-- versioned model artifacts
-
-### Portfolio
-
-- clean README
-- architecture diagram
-- model card
-- meaningful Git history
-- screenshots/demo
-- documented experiments
-
----
-
-# 46. Long-Term Architecture
-
-```text
-                    ┌─────────────────┐
-                    │ Public / Batch  │
-                    │ Data Sources    │
-                    └────────┬────────┘
-                             ↓
-                    ┌─────────────────┐
-                    │ Data Pipeline   │
-                    │ Validation      │
-                    │ Feature Store   │
-                    └────────┬────────┘
-                             ↓
-                    ┌─────────────────┐
-                    │ Training        │
-                    │ XGBoost         │
-                    │ Optuna          │
-                    └────────┬────────┘
-                             ↓
-                    ┌─────────────────┐
-                    │ Model Registry  │
-                    │ MLflow          │
-                    └────────┬────────┘
-                             ↓
-                    ┌─────────────────┐
-                    │ FastAPI         │
-                    │ Prediction API  │
-                    └───────┬─────────┘
-                            ↓
-              ┌─────────────┴─────────────┐
-              ↓                           ↓
-       ┌──────────────┐            ┌──────────────┐
-       │ PostgreSQL   │            │ Dashboard    │
-       └──────────────┘            └──────────────┘
-              │
-              ↓
-       ┌──────────────┐
-       │ Monitoring   │
-       │ Drift        │
-       └──────────────┘
-```
-
-The architecture should evolve incrementally. Do not implement the entire long-term architecture before the MVP.
-
----
-
-# 47. Guiding Principle
-
-> **Build a real ML system, not a notebook with an API attached.**
-
-The project should prioritize:
-
-1. reproducibility
-2. data quality
-3. correct evaluation
-4. explainability
-5. clean architecture
-6. testing
-7. incremental delivery
-
-The model is only one component of the system.
+Prioritize reproducibility, data quality, correct evaluation, explainability,
+maintainable code, testing and incremental delivery.

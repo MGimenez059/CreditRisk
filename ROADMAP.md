@@ -1,129 +1,97 @@
 # CreditRisk — Work Roadmap
 
-> Based on `SPECS.md`. Guiding principle: **build a real ML system, not a notebook with an API glued on.**
-
----
+This is the single source of phase status. A scaffold is not an operational feature.
+Phase 3 is complete. Two real-data runs reproduced identical grouped splits and
+validation metrics; test predictions/metrics were not computed.
 
 ## Phase 0 — Planning
-- [x] Define MVP scope and non-goals (no real PII, no automated loan approval)
-- [x] Select a public credit risk dataset (Kaggle / UCI / OpenML / LendingClub-derived)
-- [x] Document dataset provenance (source, version, license, URL, record count, target)
-- [x] Define the binary target `loan_status` (0 = no default, 1 = default) and verify the real mapping
-- [x] Define initial features (see suggested schema: age, income, employment, amount, rate, credit history, etc.)
+- [x] Define portfolio scope, target convention and non-goals.
+- [x] Select Kaggle `laotse/credit-risk-dataset`.
+- [x] Document known provenance and unknowns in the data dictionary.
+- [x] Verify source version 1, CC0 license and target 0/1 mapping via Kaggle metadata.
+- [ ] Observation horizon and collection/timing remain undocumented upstream; retain as limitations.
 
 ## Phase 1 — Repository
-- [x] Initialize a Python 3.12+ project with `pyproject.toml`
-- [x] Create the `src/credit_risk/` package structure (api, config, db, schemas, repositories, services, ml)
-- [x] Configure Ruff, MyPy, and pre-commit
-- [x] Configure Pytest
-- [x] Configure environment variables (`.env.example`)
-- [x] Write the initial README
+- [x] Python package, Ruff, MyPy, Pytest and pre-commit configuration.
+- [x] Central settings and environment example.
+- [x] Lockfile and documented Python 3.12 setup.
 
 ## Phase 2 — Data
-- [x] Download and store the dataset (evaluate whether to commit it based on license/size) — downloaded manually per the user, run through `scripts/ingest_data.py`; the raw CSV is not committed (license unclear, see `docs/data_dictionary.md`)
-- [x] Implement the ingestion script (`scripts/ingest_data.py`)
-- [x] Validate the dataset schema (types, ranges, nulls)
-- [x] Generate a data quality report — real report at `docs/data_quality_report.md`, 32,574 of 32,581 rows kept
-- [x] Perform EDA (`notebooks/01_data_exploration.ipynb`, executed against the real dataset — see its "Notes for Phase 3" cell for the `loan_grade` leakage finding)
-- [x] Document the data dictionary (`docs/data_dictionary.md`)
-- [x] Prevent data leakage (exclude post-outcome variables from the feature set) — `loan_grade` excluded from `credit_risk.ml.preprocessing.ALL_FEATURE_COLUMNS`, see `docs/model_card.md`'s Limitations section for the reasoning
+- [x] Manual CSV acquisition instructions and ingestion script.
+- [x] Structural validation, bounded row exclusions and quality report generator.
+- [x] Historical EDA execution and data dictionary.
+- [x] Document conservative exclusion of loan_grade and unresolved feature timing.
+- [x] Regenerate the expanded quality report; record source metadata and raw/validated hashes.
 
 ## Phase 3 — ML Baseline
-- [x] Create a train/validation/test split (stratified by target) — 70/15/15, `random_state=42` (`credit_risk.ml.train.split_dataset`)
-- [x] Build the preprocessing and feature engineering pipeline (`ml/preprocessing.py`, `ml/features.py`)
-- [x] Handle class imbalance — `class_weight="balanced"`; measured via `measure_class_balance` (21.82% positive)
-- [x] Train Logistic Regression as a baseline — ROC-AUC 0.8491 on validation, see `docs/model_card.md`
-- [x] Evaluate the baseline with discrimination metrics (ROC-AUC, PR-AUC) — `credit_risk.ml.evaluate.evaluate_model`
-- [x] Add Random Forest as a second baseline — ROC-AUC 0.9211 on validation, outperforms Logistic Regression on every metric
+- [x] Group identical raw model inputs before stratified 70/15/15 group splitting.
+- [x] Preserve groups across partitions, even with conflicting outcomes.
+- [x] Serialize feature engineering, preprocessing and estimator together.
+- [x] Train Logistic Regression and Random Forest with the same protocol.
+- [x] Validation metrics, class weights and baseline threshold 0.5.
+- [x] Runnable baseline CLI with artifact metadata and a split/run manifest.
+- [x] Tests for raw-input serialization, API mapping and duplicate isolation.
+- [x] Run the CLI twice on real data: 22,811 train / 4,889 validation / 4,874 test rows. Publish identical repeated validation results.
 
-## Phase 4 — XGBoost (primary model)
-- [ ] Train the first XGBoost model
-- [ ] Evaluate (ROC-AUC, PR-AUC, F1, Brier score)
-- [ ] Add cross-validation
-- [ ] Hyperparameter tuning with Optuna
-- [ ] Compare against the baselines
-- [ ] Select the candidate model and define the decision threshold
-- [ ] Calibrate probabilities
-- [ ] Define the risk score derived from the probability
+## Phase 4 — Model Selection
+- [ ] Train XGBoost and compare it with both baselines; retain the best justified candidate.
+- [ ] Group-aware cross-validation on development data; no duplicate groups across folds.
+- [ ] Bounded, seeded Optuna tuning after a stable XGBoost baseline exists.
+- [ ] Review loan_grade and loan_int_rate availability at the declared prediction time.
+- [ ] Evaluate probability calibration on data separate from estimator fitting.
+- [ ] State a demo decision objective and compare thresholds without using test results.
+- [ ] Freeze features, candidate, calibration and threshold, then evaluate the test set once.
+- [ ] Produce the selected artifact, configuration and complete evaluation report.
 
 ## Phase 5 — Explainability
-- [ ] Integrate SHAP (`ml/explain.py`)
-- [ ] Global feature importance
-- [ ] Local explanations (per individual prediction)
-- [ ] Define the explanation schema for the API
+- [ ] Global and local SHAP explanations for the selected model.
+- [ ] Define base value, output units and aggregation of encoded features.
+- [ ] Explain explicitly whether SHAP describes raw model output or the calibrated predictor.
+- [ ] Finalize explanation response schema and verify additivity in the declared output space.
 
 ## Phase 6 — Backend
-- [ ] Stand up PostgreSQL
-- [ ] Define SQLAlchemy models: Customer, Loan, CreditHistory, Prediction, Model
-- [ ] Configure Alembic (migrations)
-- [ ] Implement repositories (repository pattern)
-- [ ] Implement `prediction_service`, `risk_service`, `explanation_service`
-- [ ] Implement FastAPI endpoints: health, predictions (single + batch), customers, models
-- [ ] Validate requests/responses with Pydantic v2
-- [ ] Persist model metadata (`registry.py`, `models` table)
+- [x] FastAPI route/service/repository and ORM scaffolds exist.
+- [x] Prediction request maps available dataset fields to the raw model schema.
+- [ ] Implement Alembic revisions for the MVP prediction/model persistence flow.
+- [ ] Complete artifact loading, SHAP orchestration and transaction behavior.
+- [ ] Ensure model selection and stored model metadata agree.
+- [ ] Exercise single/batch requests against a dedicated PostgreSQL test database.
 
-## Phase 7 — Productionization
-- [ ] Dockerfile for the API
-- [ ] Docker Compose (API + PostgreSQL)
-- [ ] Structured logging
-- [ ] Centralized error handling
-- [ ] Health checks
-- [ ] Integration tests (API + DB)
+## Phase 7 — Packaging
+- [x] Dockerfile, Compose and migration startup command exist.
+- [x] Structured logging and centralized error-handler scaffolds exist.
+- [ ] Verify a clean-container prediction demo using a trained artifact and real migrations.
+- [ ] Complete request correlation, failure logging and readiness checks.
 
 ## Phase 8 — Testing & Quality
-- [ ] Unit tests (preprocessing, features, services)
-- [ ] Integration tests (endpoints, DB)
-- [ ] Reusable fixtures (`tests/fixtures/`)
-- [ ] Verify training reproducibility (seeds, data/artifact versioning)
+- [x] Unit tests for data, feature engineering, preprocessing, baselines and risk scoring.
+- [ ] Database integration tests and complete prediction-service failure coverage.
+- [x] Reproduce baseline training twice from the locked environment and pinned input snapshot.
 
-## Phase 9 — CI/CD
-- [ ] GitHub Actions: install dependencies → Ruff → MyPy → Pytest → build Docker
-- [ ] Fail the pipeline if tests or quality checks fail
-- [ ] (Future) integration tests + security scan + deploy
+## Phase 9 — CI
+- [x] Workflow runs Ruff, MyPy, Pytest and Docker build.
+- [ ] Include the operational database integration path once Phase 6 is complete.
 
 ## Phase 10 — Documentation & Portfolio
-- [ ] Model card (`docs/model_card.md`): purpose, intended use, data, metrics, limitations, biases
-- [ ] Document the architecture (`docs/architecture.md`)
-- [ ] Clean README with architecture diagram and demo/screenshots
-- [ ] Keep a clean Git history with semantic commits (`feat:`, `fix:`, `docs:`, `ci:`)
-- [ ] Review ethical/responsible considerations (do not claim real creditworthiness, review sensitive proxies)
+- [x] Separate implemented behavior from planned features; remove duplicate phase lists.
+- [x] Publish real-data baseline validation and updated model card.
+- [ ] Publish the selected-model evaluation and operational serving demo.
+- [ ] Review sensitive/proxy features and document uncertainty without compliance claims.
 
-## Phase 11 — Dashboard (optional, post-MVP)
-- [ ] Risk distribution
-- [ ] Individual prediction form
-- [ ] Prediction + SHAP visualization
-- [ ] Model metrics
-- [ ] Batch predictions
+## Post-MVP (optional)
 
-## Phase 12 — Advanced (future, out of MVP scope)
-- [ ] MLflow for experiment tracking
-- [ ] Redis + Celery/RQ for asynchronous batch jobs
-- [ ] MinIO/S3 for model artifacts
-- [ ] Prometheus/Grafana for observability
-- [ ] Feature store
-- [ ] Data drift / prediction drift detection
-- [ ] Automated retraining pipeline
-
----
+Customer/loan CRUD, a dashboard, MLflow, asynchronous batch jobs, remote artifact
+storage and drift/monitoring infrastructure need a concrete use case before implementation.
+Existing customer/loan scaffolds are not MVP acceptance criteria.
 
 ## MVP Definition
-The system is functional end-to-end when:
 
-```
-Dataset → Validation → Feature Engineering → XGBoost → Evaluation
-→ Saved model → FastAPI → POST /predictions → Probability + Risk Score + Explanation
-```
+Dataset -> validated data -> reproducible training/evaluation -> saved pipeline
+-> FastAPI prediction -> probability + risk score + SHAP -> PostgreSQL persistence.
+Include tests, Docker, CI and clear documentation. No frontend or production deployment required.
 
-Must include: reproducible training, XGBoost model, documented evaluation,
-SHAP explanation, FastAPI prediction endpoint, PostgreSQL, tests, Docker, and this README.
-**The frontend is not required for the MVP.**
+## Definition of Done
 
-## Definition of "Done" (per feature)
-- Implementation exists
-- Unit tests where applicable
-- Lint/type checks pass
-- Documentation updated
-- No committed secrets
-- Follows the project architecture
-- Reproducible behavior
-- Commit clearly describes the change
+Implementation works for the intended inputs; relevant tests and quality checks pass;
+results are reproducible; documentation reflects actual status. No secrets or direct
+personal data are committed. A checkbox does not substitute for execution evidence.

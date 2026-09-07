@@ -18,6 +18,7 @@ _VALID_PAYLOAD = {
     "interest_rate": 12.5,
     "loan_intent": "PERSONAL",
     "credit_history_years": 7,
+    "previous_defaults": 0,
 }
 
 
@@ -48,7 +49,7 @@ def test_prediction_request_rejects_invalid_home_ownership() -> None:
         PredictionRequest(**{**_VALID_PAYLOAD, "home_ownership": "PALACE"})
 
 
-def test_prediction_request_rejects_credit_utilization_above_one() -> None:
+def test_prediction_request_rejects_unsupported_fields() -> None:
     with pytest.raises(ValidationError):
         PredictionRequest(**{**_VALID_PAYLOAD, "credit_utilization": 1.5})
 

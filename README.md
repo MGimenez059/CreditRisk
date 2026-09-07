@@ -1,420 +1,161 @@
 # CreditRisk
 
-**An end-to-end machine learning system for estimating the probability of loan default.**
+A portfolio project for estimating loan default probability and demonstrating
+Data Science, ML Engineering, and Backend development with public tabular data.
 
-CreditRisk is a portfolio-grade Data Science / ML Engineering / Backend project. It goes from raw tabular data to a served, explainable, containerized prediction API - not just a notebook with a model in it.
+**Current status: Phase 3 complete; ready for Phase 4 model comparison.** Ingestion,
+feature engineering, preprocessing, Logistic Regression and Random Forest training
+are implemented. XGBoost training, probability calibration, SHAP explanations and
+an operational prediction API are still pending. See [ROADMAP.md](ROADMAP.md).
 
-> **Educational / portfolio project.** This system uses public, anonymized data and synthetic examples. It does **not** connect to any real financial institution, does not process real PII, and must not be used to make real lending decisions. See [Ethical Considerations](#ethical-considerations).
+## Scope
 
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Repository Structure](#repository-structure)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [API Reference](#api-reference)
-- [Model](#model)
-- [Explainability](#explainability)
-- [Testing](#testing)
-- [CI/CD](#cicd)
-- [Documentation](#documentation)
-- [Ethical Considerations](#ethical-considerations)
-- [Roadmap](#roadmap)
-- [License](#license)
-
----
-
-## Overview
-
-CreditRisk predicts the probability that a borrower will default on a loan, and exposes that prediction - together with a risk score and a human-readable explanation - through a REST API.
-
-**Highlights:**
-
-- Reproducible data ingestion, validation, and preprocessing pipeline
-- Exploratory data analysis and automated data quality reports
-- Baseline models (Logistic Regression, Random Forest) compared against a tuned **XGBoost** production model
-- Evaluation beyond accuracy: ROC-AUC, PR-AUC, F1, Log Loss, Brier Score, calibration
-- Per-prediction explanations powered by **SHAP**
-- **FastAPI** service with single and batch prediction endpoints
-- **PostgreSQL** persistence for customers, loans, predictions, and model metadata
-- Fully containerized with **Docker Compose**
-- Automated linting, type-checking, and testing via **GitHub Actions**
-
----
+The MVP is a reproducible training workflow, an evaluated model, SHAP explanations,
+a FastAPI prediction endpoint, PostgreSQL prediction/model persistence, tests,
+Docker and CI. XGBoost is the next candidate to compare, not a predetermined winner.
+Customer/loan CRUD, a frontend and advanced infrastructure are outside the MVP.
 
 ## Architecture
 
 ```text
-                    ┌────────────────────┐
-                    │   Public Dataset   │
-                    │   CSV / Parquet    │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ Data Validation    │
-                    │ + Profiling        │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │Feature Engineering │
-                    │ + Preprocessing    │
-                    └─────────┬──────────┘
-                              │
-                    ┌─────────┴─────────┐
-                    ▼                   ▼
-          ┌─────────────────┐   ┌─────────────────┐
-          │    Training     │   │   Evaluation    │
-          │    XGBoost      │   │    Metrics      │
-          └────────┬────────┘   └────────┬────────┘
-                   │                     │
-                   └──────────┬──────────┘
-                              ▼
-                    ┌────────────────────┐
-                    │   Model Artifact   │
-                    │   + Metadata       │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │      FastAPI       │
-                    │ Prediction Service │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │     PostgreSQL     │
-                    │     Customers      │
-                    │     Loans          │
-                    │     Predictions    │
-                    └────────────────────┘
+Public CSV -> validation/report -> validated Parquet
+  -> grouped train/validation/test split
+  -> raw inputs -> derived features -> preprocessing -> estimator
+  -> validation metrics + pipeline artifact + run manifest
+
+Planned serving:
+FastAPI -> request-to-source mapping -> same pipeline -> probability/risk score
+  -> SHAP -> PostgreSQL -> response
 ```
 
-Inference request flow:
+Details: [architecture](docs/architecture.md), [specification](SPECS.md),
+[engineering conventions](CODESTYLE.md).
 
-```text
-FastAPI endpoint -> Pydantic validation -> Prediction service -> Feature builder
--> Preprocessing pipeline -> XGBoost model -> Probability -> Risk score
--> SHAP explanation -> Persist prediction -> API response
-```
+## Setup
 
----
-
-## Tech Stack
-
-| Layer | Tools |
-|---|---|
-| **Backend** | Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.x, Alembic, Uvicorn |
-| **Data** | Pandas, NumPy, PyArrow |
-| **Machine Learning** | XGBoost, scikit-learn, SHAP, Optuna, joblib |
-| **Database** | PostgreSQL |
-| **Visualization** | Matplotlib (EDA notebooks) |
-| **Quality** | Pytest, Ruff, MyPy, pre-commit |
-| **Infrastructure** | Docker, Docker Compose |
-| **CI/CD** | GitHub Actions |
-
----
-
-## Repository Structure
-
-```text
-credit-risk/
-├── src/credit_risk/
-│   ├── api/                # FastAPI routes & dependencies
-│   ├── config/              # Settings
-│   ├── db/                  # SQLAlchemy models, session, base
-│   ├── schemas/              # Pydantic schemas
-│   ├── repositories/         # Data access layer
-│   ├── services/              # prediction / risk / explanation services
-│   ├── ml/                    # preprocessing, features, train, evaluate, predict, explain, registry
-│   └── main.py
-├── data/                   # raw / interim / processed (not fully committed)
-├── models/                 # serialized model artifacts
-├── notebooks/               # EDA, feature engineering, model analysis
-├── tests/                   # unit / integration / fixtures
-├── scripts/                 # ingest_data.py, train_model.py, evaluate_model.py
-├── alembic/                 # DB migrations
-├── docs/                     # model_card.md, data_dictionary.md, architecture.md
-├── .github/workflows/ci.yml
-├── docker/
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-├── .env.example
-└── README.md
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Docker & Docker Compose
-- Python 3.12+ (for local development outside Docker)
-
-### Run with Docker (recommended)
+Python 3.12 is the development and CI reference runtime. Install
+[uv](https://docs.astral.sh/uv/getting-started/installation/) to use the committed lockfile.
 
 ```bash
-git clone https://github.com/<your-user>/credit-risk.git
-cd credit-risk
-cp .env.example .env
-
-docker compose up --build
+git clone https://github.com/MGimenez059/CreditRisk.git
+cd CreditRisk
+uv sync --locked --python 3.12 --extra dev --extra viz
 ```
 
-This starts the FastAPI service and PostgreSQL, and applies database migrations. The API will be available at `http://localhost:8000`.
-
-Interactive API docs: `http://localhost:8000/docs`
-
-### Run locally
+Download the CSV manually following the [data dictionary](docs/data_dictionary.md)
+and save it at `data/raw/credit_risk_dataset.csv`. The dataset is not bundled.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-
-pip install -e ".[dev]"
-
-# start PostgreSQL separately, then:
-alembic upgrade head
-
-uvicorn credit_risk.main:app --reload
+uv run --locked python scripts/ingest_data.py
+uv run --locked python scripts/train_baselines.py
 ```
 
-### Train the model
+The baseline command writes both pipelines, JSON sidecars, `run.json` and
+`validation.md` to `models/baselines-v1/`. The manifest records the input file's
+SHA-256, split positions, seed, features, estimator parameters, dependency versions
+and validation metrics. It does not compute test predictions or test metrics.
+Use `--output models/baselines-v2` for another run; existing runs are not overwritten.
 
-```bash
-python scripts/ingest_data.py
-python scripts/train_model.py
-python scripts/evaluate_model.py
-```
+`scripts/train_model.py` and `scripts/evaluate_model.py` are Phase 4 placeholders;
+they currently exit with an explanatory error, not a trained XGBoost model.
 
-Training artifacts are written to `models/` and evaluation reports to `docs/`.
+## Model status
 
----
+Both baselines use class weights and the same grouped split. Identical raw model
+inputs remain in one partition, including rows with conflicting labels. The
+70/15/15 proportions apply to groups; actual row proportions are reported per run.
+Median imputation and scaling are fitted only on training data, followed by
+one-hot encoding and classification. Derived features are inside the saved pipeline.
 
-## Configuration
+Metrics: ROC-AUC, average precision (`pr_auc`), F1, precision, recall, log loss and
+Brier score. Threshold 0.5 is a baseline convention; calibration and threshold
+selection are Phase 4 work. The real-data grouped run was repeated with identical validation metrics and split
+assignments: see [model card](docs/model_card.md) and [run summary](docs/baseline_results.json).
 
-Environment variables (`.env.example`):
+## API contract (serving not yet complete)
 
-```env
-APP_ENV=development
+Liveness is `GET /health` at the root. Under `/api/v1`, route scaffolds are
+`GET /models/active`, `POST /predictions` and `POST /predictions/batch`.
+Health reports process availability, not model/database readiness.
 
-DATABASE_URL=postgresql+psycopg://creditrisk:creditrisk@db:5432/creditrisk
-
-MODEL_PATH=models/credit_risk_xgboost_v1.joblib
-
-LOG_LEVEL=INFO
-```
-
-Secrets are never committed to the repository.
-
----
-
-## API Reference
-
-Base URL: `/api/v1`
-
-### Health check
-
-```http
-GET /health
-```
-
-```json
-{ "status": "ok" }
-```
-
-### Active model info
-
-```http
-GET /models/active
-```
-
-```json
-{
-  "name": "credit-risk-xgboost",
-  "version": "1.0.0",
-  "algorithm": "XGBoost",
-  "roc_auc": 0.82
-}
-```
-
-### Single prediction
-
-```http
-POST /predictions
-```
-
-**Request**
+Example synthetic request:
 
 ```json
 {
   "age": 34,
-  "income": 1450000,
+  "income": 60000,
   "employment_years": 6,
   "home_ownership": "RENT",
-  "loan_amount": 500000,
+  "loan_amount": 12000,
   "interest_rate": 12.5,
-  "term_months": 36,
   "loan_intent": "PERSONAL",
   "credit_history_years": 7,
-  "late_payments": 1,
-  "previous_defaults": 0,
-  "credit_utilization": 0.42,
-  "active_credit_lines": 4
+  "previous_defaults": 0
 }
 ```
 
-**Response**
+`previous_defaults` is a required 0/1 indicator. Employment duration and interest
+rate may explicitly be null, matching missing values in the dataset. Unknown
+fields are rejected. Unsupported bureau fields are not accepted or fabricated.
+Income must be positive. Monetary inputs must use the source dataset's units;
+its currency is not verified, so examples are not localized currency conversions.
 
-```json
-{
-  "default_probability": 0.183,
-  "risk_score": 18,
-  "risk_level": "LOW",
-  "model": {
-    "name": "credit-risk-xgboost",
-    "version": "1.0.0"
-  },
-  "explanation": [
-    {
-      "feature": "debt_to_income",
-      "impact": 0.18,
-      "direction": "positive"
-    }
-  ]
-}
-```
+The intended response includes probability, score, level, model name/version and
+SHAP contributions. `risk_score = round(default_probability * 100)`;
+0–30 LOW, 31–70 MEDIUM, 71–100 HIGH, based on the rounded score.
+These illustrative categories are separate from a classification threshold.
+SHAP units/base value and the relationship to calibration must be finalized in Phase 5.
 
-### Batch prediction
+## Local service and Docker
 
-```http
-POST /predictions/batch
-```
-
-Accepts a JSON array of loan applications and returns predictions, probabilities, risk levels, and the model version used for each record.
-
-Invalid requests return `HTTP 422` with field-level validation errors (via Pydantic).
-
----
-
-## Model
-
-**Primary algorithm:** `XGBClassifier`
-
-| Metric | Value |
-|---|---|
-| ROC-AUC | 0.82 |
-| PR-AUC | 0.65 |
-| F1 | 0.58 |
-| Brier Score | 0.09 |
-
-*(Illustrative values - actual numbers depend on the selected dataset and are documented per model version in `docs/model_card.md`.)*
-
-- Compared against Logistic Regression and Random Forest baselines using the same validation protocol
-- Hyperparameters tuned with **Optuna**, optimizing primarily for ROC-AUC (secondary: PR-AUC, Brier Score, F1, calibration)
-- Evaluated with **StratifiedKFold** cross-validation (5 folds)
-- Probabilities calibrated; decision threshold selected against the project's stated business objective (not a default `0.5`)
-- Class imbalance handled via `scale_pos_weight` / class weights / threshold optimization
-- Every model artifact is versioned (`credit-risk-xgboost:v1.0.0`) with training dataset version, feature version, and metrics; every stored prediction records the model version used
-
-**Risk score**
-
-```text
-risk_score = round(default_probability * 100)
-
-0-30   LOW
-31-70  MEDIUM
-71-100 HIGH
-```
-
-This is a presentation-layer score, not an industry-standard credit score.
-
----
-
-## Explainability
-
-Every prediction includes a **SHAP**-based explanation showing which features pushed the probability up or down:
-
-```text
-default_probability = 0.73
-
-Top contributors:
-debt_to_income       +0.21
-late_payments        +0.14
-credit_utilization   +0.08
-income               -0.06
-employment_years     -0.04
-```
-
-Global feature importance and summary plots are available in `notebooks/03_model_analysis.ipynb` and `docs/model_card.md`.
-
----
-
-## Testing
+Copy `.env.example` to `.env`. For a local Python process use a PostgreSQL URL
+with `localhost`; the example hostname `db` is for Compose networking.
 
 ```bash
-pytest
-ruff check .
-mypy src scripts
+uv run --locked uvicorn credit_risk.main:app --reload
+docker compose up --build
 ```
 
-- **Unit tests** - feature engineering, validation, risk scoring, preprocessing, prediction service, repositories
-- **Integration tests** - FastAPI to service to database, against a dedicated test database
-- **ML tests** - the pipeline trains successfully, probabilities fall in `[0, 1]`, prediction schema is stable, feature columns match the training schema, no unexpected NaNs reach inference
+Compose defines PostgreSQL, a migration command and the API. No Alembic revisions
+exist yet, so `alembic upgrade head` currently creates no application tables.
+No production model is bundled, and SHAP is a placeholder: a running container
+does not yet mean predictions work. The configured artifact is selected through
+`MODEL_PATH`; `.env.example` lists the remaining configuration.
 
----
+## Quality
 
-## CI/CD
-
-GitHub Actions runs on every push and pull request:
-
-```text
-Install dependencies -> Ruff -> MyPy -> Pytest -> Build Docker image
+```bash
+uv run --locked ruff format --check .
+uv run --locked ruff check .
+uv run --locked mypy src scripts
+uv run --locked pytest
 ```
 
-The pipeline fails the build if linting, type-checking, or tests fail.
+GitHub Actions runs quality checks and a Docker build for pushes to `main` and
+pull requests targeting `main`. Database integration coverage is still pending.
+This is CI; automated deployment is outside the current scope.
 
----
+## Ethical considerations
+
+Educational/portfolio use only. No real lending decisions, automated loan approvals
+or claims about an individual's actual creditworthiness. The public dataset's
+population, collection process, default observation horizon and synthetic origin
+are not independently verified. Do not claim it represents real-world performance.
+Use synthetic API examples and no direct personal identifiers. Limitations and
+potential bias belong in the [model card](docs/model_card.md).
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| [`SPECS.md`](SPECS.md) | Full technical specification this project is built against |
-| [`docs/model_card.md`](docs/model_card.md) | Purpose, intended use, training data, metrics, limitations, bias considerations |
-| [`docs/data_dictionary.md`](docs/data_dictionary.md) | Field-by-field description of the canonical data model |
-| [`docs/architecture.md`](docs/architecture.md) | Detailed system architecture and design decisions |
-| [`ROADMAP.md`](ROADMAP.md) | Phased development roadmap |
-
----
-
-## Ethical Considerations
-
-Credit risk is a high-impact domain. This project is **educational and portfolio-oriented**:
-
-- Uses public, anonymized data only - no real names, addresses, government IDs, or financial records
-- Does **not** represent an individual's actual creditworthiness
-- Has not undergone real-world validation or regulatory/compliance review
-- Should not be used to make real lending or credit decisions
-- Potential dataset bias and proxy features are documented in the model card
-
----
-
-## Roadmap
-
-See [`ROADMAP.md`](ROADMAP.md) for the full phased plan (data, baseline models, XGBoost, explainability, backend, productionization, CI/CD).
-
-**MVP scope:** reproducible training, XGBoost model, documented evaluation, SHAP explanations, FastAPI prediction endpoint, PostgreSQL, tests, Docker, and this README.
-
----
+- [ROADMAP.md](ROADMAP.md): the single source of phase status and acceptance criteria.
+- [SPECS.md](SPECS.md): required behavior and scope.
+- [CODESTYLE.md](CODESTYLE.md): engineering conventions.
+- [Data dictionary](docs/data_dictionary.md): provenance, fields and mappings.
+- [Data quality report](docs/data_quality_report.md): regenerated ingestion evidence.
+- [Dataset provenance](docs/dataset_provenance.json): source metadata and snapshot hashes.
+- [Baseline results](docs/baseline_results.json): verified parameters, environment and metrics.
+- [Model card](docs/model_card.md): evaluation status and limitations.
+- [Architecture](docs/architecture.md): implementation boundaries and remaining work.
 
 ## License
 
-MIT - see [`LICENSE`](LICENSE) for details.
+Project code: MIT, see [LICENSE](LICENSE). Dataset redistribution rights are separate.

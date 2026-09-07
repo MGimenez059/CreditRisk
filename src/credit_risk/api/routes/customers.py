@@ -3,11 +3,9 @@
 Note:
     This router is implemented but deliberately **not** mounted on the
     FastAPI app yet — see `main.py`. SPECS.md §4 lists `customers.py` as
-    part of the Phase 1 repository structure, and ROADMAP.md bundles the
-    live `customers` endpoint into Phase 6 (Backend) alongside the rest of
-    the persistence layer. The handlers below are real and tested-ready,
-    not stubs, so wiring them in is a one-line change in `main.py` once
-    Phase 6 starts — not a rewrite.
+    part of the initial scaffold. Customer CRUD is now outside the MVP.
+    Before enabling it, add a customer service and integration tests;
+    mounting the existing router alone is not a completion criterion.
 """
 
 from typing import Annotated
@@ -33,7 +31,7 @@ def _get_customer_repository(
 
 
 @router.post("", response_model=CustomerRead)
-async def create_customer(
+def create_customer(
     payload: CustomerCreate,
     repository: Annotated[SQLAlchemyCustomerRepository, Depends(_get_customer_repository)],
 ) -> CustomerRead:
@@ -43,7 +41,7 @@ async def create_customer(
 
 
 @router.get("/{customer_id}", response_model=CustomerRead)
-async def get_customer(
+def get_customer(
     customer_id: UUID,
     repository: Annotated[SQLAlchemyCustomerRepository, Depends(_get_customer_repository)],
 ) -> CustomerRead:
