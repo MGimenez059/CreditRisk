@@ -17,7 +17,11 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.pytest-tmp/
 .coverage
+.coverage.*
+coverage.xml
+pytestdebug.log
 htmlcov/
 .tox/
 
@@ -28,10 +32,9 @@ data/interim/*
 !data/interim/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
-models/*.joblib
-models/*.json
+# Local artifacts and experiment outputs; publish reviewed summaries in docs/.
+models/*
 !models/.gitkeep
-models/baselines*/
 
 # --- Notebooks checkpoints ---------------------------------------------------
 .ipynb_checkpoints/
