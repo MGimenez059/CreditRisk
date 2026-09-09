@@ -1,8 +1,8 @@
 """Trains models for the credit default pipeline.
 
 `train_baseline` (roadmap Phase 3, Logistic Regression / Random Forest) is
-fully implemented. `train_model` (roadmap Phase 4, the production XGBoost
-pipeline) remains a stub — see its own docstring.
+fully implemented. XGBoost is an initial Phase 4 candidate, not a selected
+production model.
 
 Per CODESTYLE.md §14: `random_state=42` is set everywhere randomness is
 involved, and the trained pipeline is a single serializable artifact
@@ -19,15 +19,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
+from xgboost import XGBClassifier
 
 from credit_risk.ml.features import add_derived_features
 from credit_risk.ml.preprocessing import RAW_FEATURE_COLUMNS, build_preprocessing_pipeline
 from credit_risk.ml.protocols import FittedPipeline
-from credit_risk.ml.registry import ModelArtifactMetadata
 
 DEFAULT_RANDOM_STATE = 42
 
 BaselineModelType = Literal["logistic_regression", "random_forest"]
+CandidateModelType = Literal["logistic_regression", "random_forest", "xgboost"]
 
 
 @dataclass(frozen=True)
@@ -193,26 +194,31 @@ def train_baseline(model_type: BaselineModelType, split: DatasetSplit) -> Fitted
     return pipeline  # type: ignore[no-any-return]
 
 
-def train_model(
-    training_data: pd.DataFrame,
-    dataset_version: str,
-) -> tuple[FittedPipeline, ModelArtifactMetadata]:
-    """Train the production XGBoost pipeline on a prepared training set.
-
-    Args:
-        training_data: Output of `ml.preprocessing` and `ml.features`,
-            including the `loan_status` target column.
-        dataset_version: Identifier of the dataset snapshot used, recorded
-            in the resulting metadata for traceability.
-
-    Returns:
-        The fitted pipeline and its metadata, ready for
-        `ml.registry.save_model_artifact`.
-
-    Raises:
-        NotImplementedError: Always, until roadmap Phase 4 is implemented.
-    """
-    # TODO(ROADMAP-P4): train XGBoost with Optuna tuning and
-    # StratifiedKFold cross-validation, per docs/model_card.md once the
-    # Phase 3 baselines (train_baseline, above) have set the comparison bar.
-    raise NotImplementedError("Model training is implemented in roadmap Phase 4 (XGBoost).")
+def build_candidate_pipeline(model_type: CandidateModelType) -> Pipeline:
+    """Build a fixed initial candidate with the shared raw-input transformations."""
+    if model_type != "xgboost":
+        return build_baseline_pipeline(model_type)
+    # Fixed before validation: modest CPU histogram model, without class weighting.
+    estimator = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="logloss",
+        tree_method="hist",
+        n_estimators=200,
+        max_depth=3,
+        learning_rate=0.05,
+        min_child_weight=1,
+        subsample=1.0,
+        colsample_bytree=1.0,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        scale_pos_weight=1.0,
+        random_state=DEFAULT_RANDOM_STATE,
+        n_jobs=1,
+    )
+    return Pipeline(
+        steps=[
+            ("features", FunctionTransformer(add_derived_features, validate=False)),
+            ("preprocessing", build_preprocessing_pipeline()),
+            ("model", estimator),
+        ]
+    )

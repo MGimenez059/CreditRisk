@@ -3,10 +3,10 @@
 A portfolio project for estimating loan default probability and demonstrating
 Data Science, ML Engineering, and Backend development with public tabular data.
 
-**Current status: Phase 3 complete; ready for Phase 4 model comparison.** Ingestion,
-feature engineering, preprocessing, Logistic Regression and Random Forest training
-are implemented. XGBoost training, probability calibration, SHAP explanations and
-an operational prediction API are still pending. See [ROADMAP.md](ROADMAP.md).
+**Current status: Phase 4 initial candidate comparison implemented.** Ingestion,
+feature engineering, preprocessing and fixed Logistic Regression, Random Forest
+and XGBoost training are implemented. Cross-validation, tuning, probability
+calibration, SHAP explanations and an operational prediction API are still pending. See [ROADMAP.md](ROADMAP.md).
 
 ## Scope
 
@@ -56,8 +56,19 @@ SHA-256, split positions, seed, features, estimator parameters, dependency versi
 and validation metrics. It does not compute test predictions or test metrics.
 Use `--output models/baselines-v2` for another run; existing runs are not overwritten.
 
-`scripts/train_model.py` and `scripts/evaluate_model.py` are Phase 4 placeholders;
-they currently exit with an explanatory error, not a trained XGBoost model.
+Compare all three fixed candidates on the same grouped split:
+
+```bash
+uv run --locked python scripts/train_model.py
+```
+
+This writes three complete pipelines, metadata, `run.json` and `validation.md` to
+`models/candidates-v1/`. Use `--output models/candidates-v2` for another run.
+XGBoost starts unweighted with 200 depth-3 trees and learning rate 0.05; the
+baselines retain their Phase 3 class weights. No tuning, early stopping, model
+promotion or test scoring occurs. See [candidate results](docs/candidate_results.json)
+and the [model card](docs/model_card.md) for the verified comparison.
+`scripts/evaluate_model.py` remains a placeholder until final selection is frozen.
 
 ## Model status
 

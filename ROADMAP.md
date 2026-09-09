@@ -34,7 +34,8 @@ validation metrics; test predictions/metrics were not computed.
 - [x] Run the CLI twice on real data: 22,811 train / 4,889 validation / 4,874 test rows. Publish identical repeated validation results.
 
 ## Phase 4 — Model Selection
-- [ ] Train XGBoost and compare it with both baselines; retain the best justified candidate.
+- [x] Train fixed XGBoost and compare it with both baselines on the same grouped validation split; publish the initial evidence.
+- [ ] Select the best justified candidate after cross-validation and tuning.
 - [ ] Group-aware cross-validation on development data; no duplicate groups across folds.
 - [ ] Bounded, seeded Optuna tuning after a stable XGBoost baseline exists.
 - [ ] Review loan_grade and loan_int_rate availability at the declared prediction time.

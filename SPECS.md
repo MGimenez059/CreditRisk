@@ -100,7 +100,9 @@ historical numbers must not be reused as new-protocol results.
 Train XGBClassifier as the next candidate, with a fixed seed and a modest initial
 configuration. Compare against both baselines; choose the best justified model,
 considering discrimination, probability quality and complexity. Do not require
-XGBoost to win to satisfy the project goal.
+XGBoost to win to satisfy the project goal. The initial `scripts/train_model.py`
+comparison uses the Phase 3 split and shared preprocessing; it writes all candidate
+artifacts to a fresh directory without selecting a production model or scoring test.
 
 ## 14. Hyperparameter Optimization
 

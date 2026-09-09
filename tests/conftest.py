@@ -11,10 +11,6 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-# NOTE: as of starlette 1.6, TestClient emits a deprecation warning pointing
-# at an `httpx2` replacement package. Tracked for a future dependency bump;
-# not addressed here to avoid pulling in an unfamiliar transport dependency
-# during the Phase 1 skeleton.
 from credit_risk.main import app
 
 

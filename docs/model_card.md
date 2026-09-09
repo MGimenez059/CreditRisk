@@ -1,7 +1,7 @@
 # Model Card — CreditRisk
 
-**Status: Phase 3 complete; real-data grouped baselines reproduced twice on
-2026-09-07. No production model has been selected.**
+**Status: initial Phase 4 candidate comparison run on 2026-09-09. Phase 3
+baselines reproduced; no production model has been selected.**
 
 ## Purpose and intended use
 
@@ -85,10 +85,39 @@ records the source version and both raw/validated hashes. Artifacts accept raw
 source inputs; feature engineering is serialized with preprocessing and estimator.
 Same seed alone does not promise bit-identical results across platforms/runtimes.
 
+## Initial XGBoost comparison
+
+Run: `models/candidates-v1`, 2026-09-09, on the same snapshot and exact split
+positions as Phase 3. Both baseline results match the earlier run within 1e-12.
+Full parameters, runtime and metrics: [candidate results](candidate_results.json).
+
+XGBoost uses CPU histogram trees, seed 42, one thread, 200 trees, depth 3 and
+learning rate 0.05. It starts without class weighting (`scale_pos_weight=1`);
+Logistic Regression and Random Forest retain their balanced class weights.
+This is an initial comparison of configurations, not an isolated comparison of
+algorithms. Parameters were fixed before validation; no early stopping or tuning.
+See the [XGBoost parameter reference](https://xgboost.readthedocs.io/en/stable/parameter.html).
+
+| Validation metric | Logistic Regression | Random Forest | XGBoost |
+|---|---:|---:|---:|
+| roc_auc | 0.860188 | 0.932167 | 0.927015 |
+| pr_auc | 0.688847 | 0.874833 | 0.871481 |
+| f1 | 0.606686 | 0.785679 | 0.790123 |
+| log_loss | 0.473660 | 0.259069 | 0.236647 |
+| brier_score | 0.155617 | 0.073457 | 0.066314 |
+| precision | 0.489106 | 0.824923 | 0.925786 |
+| recall | 0.798689 | 0.750000 | 0.689139 |
+
+Random Forest retains higher ROC-AUC and average precision. XGBoost has lower
+log loss and Brier score, and higher precision but lower recall at threshold 0.5.
+These validation results do not establish calibration or a final winner.
+Cross-validation, weighting comparisons, tuning, calibration and threshold
+selection remain pending. Test predictions and metrics were not computed.
+
 ## Model selection, calibration and explanations
 
-XGBoost is a Phase 4 candidate, compared against these baselines under a common
-protocol. Selection must consider discrimination, probability quality and complexity.
+XGBoost is an initial Phase 4 candidate compared against these baselines under
+a common split and preprocessing protocol. Selection must consider discrimination, probability quality and complexity.
 The selected model may be Random Forest if it is better justified.
 Calibrate using development data separate from fitting the estimator; freeze all
 choices before final test scoring. A demo threshold objective remains to be stated.

@@ -1,8 +1,4 @@
-"""Unit tests for `credit_risk.ml.train`'s baseline-training functions.
-
-`train_model` (the Phase 4 XGBoost stub) is not tested here — it still
-raises `NotImplementedError` by design; see `ml/train.py`'s docstring.
-"""
+"""Unit tests for splitting, class balance and baseline training."""
 
 import numpy as np
 import pandas as pd
@@ -20,7 +16,7 @@ def _synthetic_dataset(n: int = 200) -> pd.DataFrame:
     """Build a small, clearly-synthetic dataset with the real column names.
 
     Never a fixture that could be mistaken for a sample of the real
-    Kaggle dataset — matches the pattern already used in
+    Kaggle dataset â€” matches the pattern already used in
     `tests/unit/test_ingest_data.py`.
     """
     rng = np.random.default_rng(42)
@@ -128,7 +124,7 @@ def test_train_baseline_produces_a_pipeline_that_predicts_probabilities(model_ty
 
 
 def test_split_dataset_train_val_test_indices_never_overlap() -> None:
-    """Guards SPECS.md §9 rules 1 and 6: splits must stay isolated from each other."""
+    """Guards SPECS.md Â§9 rules 1 and 6: splits must stay isolated from each other."""
     frame = _synthetic_dataset(n=200)
 
     split = split_dataset(frame, target_column="loan_status")

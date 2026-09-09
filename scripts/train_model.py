@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
-"""CLI entrypoint for model training.
+"""Compare fixed XGBoost and baseline candidates without scoring the test set."""
 
-Runnable end-to-end on a clean checkout with no manual steps beyond
-`pip install` and running `scripts/ingest_data.py` first, per the
-reproducibility requirement in CODESTYLE.md §14. Implemented in roadmap
-Phase 4 (XGBoost).
-
-Usage:
-    python scripts/train_model.py
-"""
-
+import argparse
 import sys
+from pathlib import Path
 
-from credit_risk.ml.train import DEFAULT_RANDOM_STATE
+from xgboost.core import XGBoostError
+
+from credit_risk.exceptions import CreditRiskError
+from credit_risk.ml.experiments import CANDIDATE_TYPES, run_experiment
 
 
 def main() -> int:
-    """Train the production pipeline and persist it via `ml.registry`.
-
-    Returns:
-        Process exit code: 0 on success, 1 if training cannot proceed.
-    """
-    # TODO(ROADMAP-P4): load processed data, call credit_risk.ml.train.train_model
-    # with random_state=DEFAULT_RANDOM_STATE, then ml.registry.save_model_artifact.
-    print(
-        "Model training is implemented in roadmap Phase 4 (XGBoost). "
-        f"Configured random_state: {DEFAULT_RANDOM_STATE}.",
-        file=sys.stderr,
+    """Write candidate artifacts and validation evidence to a fresh run directory."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--input", type=Path, default=Path("data/interim/credit_risk_validated.parquet")
     )
-    return 1
+    parser.add_argument("--output", type=Path, default=Path("models/candidates-v1"))
+    args = parser.parse_args()
+    try:
+        manifest_path = run_experiment(args.input, args.output, CANDIDATE_TYPES)
+    except (OSError, ValueError, KeyError, CreditRiskError, XGBoostError) as err:
+        print(f"Candidate training failed: {err}", file=sys.stderr)
+        return 1
+    print(f"Validation comparison and split manifest: {manifest_path}")
+    return 0
 
 
 if __name__ == "__main__":

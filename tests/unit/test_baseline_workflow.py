@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import train_baselines
+from credit_risk.ml import experiments
 from credit_risk.ml.evaluate import EvaluationReport, evaluate_model
 from credit_risk.ml.preprocessing import RAW_FEATURE_COLUMNS
 from credit_risk.ml.registry import load_model_artifact
-from credit_risk.ml.train import build_baseline_pipeline, split_dataset
+from credit_risk.ml.train import build_candidate_pipeline, split_dataset
 from credit_risk.schemas.prediction import PredictionRequest
 from credit_risk.services.prediction_service import _to_feature_frame
 from tests.unit.test_train import _synthetic_dataset
@@ -35,7 +35,9 @@ def test_split_keeps_identical_inputs_and_conflicting_labels_together() -> None:
     assert groups[1].isdisjoint(groups[2])
 
 
+@pytest.mark.parametrize("model_types", [experiments.BASELINE_TYPES, experiments.CANDIDATE_TYPES])
 def test_baseline_run_round_trips_api_input_without_scoring_test(
+    model_types,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -50,11 +52,11 @@ def test_baseline_run_round_trips_api_input_without_scoring_test(
         assert features.index.tolist() == expected_split.x_val.index.tolist()
         return evaluate_model(pipeline, features, target)
 
-    monkeypatch.setattr(train_baselines, "evaluate_model", evaluate_validation_only)
+    monkeypatch.setattr(experiments, "evaluate_model", evaluate_validation_only)
     output_dir = tmp_path / "run"
-    manifest_path = train_baselines.run_baselines(input_path, output_dir)
+    manifest_path = experiments.run_experiment(input_path, output_dir, model_types)
     manifest = json.loads(manifest_path.read_text())
-    assert len(evaluated_indices) == 2
+    assert len(evaluated_indices) == len(model_types)
     assert manifest["test_evaluated"] is False
     assert manifest["dataset_version"].startswith("sha256:")
     assert set(manifest["split_positions"]["test"]) == set(expected_split.x_test.index)
@@ -74,10 +76,10 @@ def test_baseline_run_round_trips_api_input_without_scoring_test(
     raw_input = _to_feature_frame(request)
     assert set(raw_input.columns) == set(RAW_FEATURE_COLUMNS)
     assert raw_input.loc[0, "cb_person_default_on_file"] == "Y"
-    for model_type in train_baselines.BASELINE_TYPES:
+    for model_type in model_types:
         artifact = load_model_artifact(output_dir / f"{model_type}.joblib")
         probability = artifact.pipeline.predict_proba(raw_input)
-        reference = build_baseline_pipeline(model_type)
+        reference = build_candidate_pipeline(model_type)
         reference.fit(expected_split.x_train, expected_split.y_train)
         np.testing.assert_allclose(probability, reference.predict_proba(raw_input))
         assert np.isfinite(probability).all()
@@ -85,12 +87,15 @@ def test_baseline_run_round_trips_api_input_without_scoring_test(
         assert artifact.metadata.python_version != "unknown"
         assert "scikit-learn" in artifact.metadata.dependency_versions
     with pytest.raises(FileExistsError):
-        train_baselines.run_baselines(input_path, output_dir)
+        experiments.run_experiment(input_path, output_dir, model_types)
 
 
-def test_pipeline_ignores_supplied_derived_values_and_fits_training_medians_only() -> None:
+@pytest.mark.parametrize("model_type", experiments.CANDIDATE_TYPES)
+def test_pipeline_ignores_supplied_derived_values_and_fits_training_medians_only(
+    model_type,
+) -> None:
     split = split_dataset(_synthetic_dataset(), "loan_status")
-    pipeline = build_baseline_pipeline("logistic_regression")
+    pipeline = build_candidate_pipeline(model_type)
     pipeline.fit(split.x_train, split.y_train)
     imputer = (
         pipeline.named_steps["preprocessing"].named_transformers_["numeric"].named_steps["impute"]
@@ -132,3 +137,15 @@ def test_api_requires_a_binary_prior_default(indicator: int | None) -> None:
             credit_history_years=7,
             previous_defaults=indicator,
         )
+
+
+@pytest.mark.parametrize("target", [None, 0, 2])
+def test_experiment_rejects_invalid_targets_without_creating_outputs(tmp_path, target):
+    frame = _synthetic_dataset()
+    frame["loan_status"] = target
+    input_path = tmp_path / "invalid.parquet"
+    frame.to_parquet(input_path, index=False)
+    output_dir = tmp_path / "run"
+    with pytest.raises(ValueError, match="target"):
+        experiments.run_experiment(input_path, output_dir, experiments.CANDIDATE_TYPES)
+    assert not output_dir.exists()

@@ -72,7 +72,9 @@ version alone is not enough to reconstruct an input that was never retained.
 
 ## Remaining work
 
-XGBoost training/evaluation CLIs and `ml.explain` are placeholders. Phase 3 functions
-are implemented. Alembic has no revisions yet; Compose runs its migration command
+`scripts/train_model.py` compares fixed XGBoost and baseline pipelines using
+`ml.experiments`, shared with the Phase 3 CLI. It records validation only and does
+not select a production model. Cross-validation, tuning and calibration remain
+pending. The final evaluation CLI and `ml.explain` are placeholders. Alembic has no revisions yet; Compose runs its migration command
 but creates no application tables. Integration tests and operational prediction
 serving are not complete. Follow [ROADMAP.md](../ROADMAP.md), not file presence, for status.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """CLI entrypoint for standalone model evaluation.
 
-Reports the metrics in README.md's Model section for the currently active
-artifact and writes them to `docs/model_card.md`. Implemented in roadmap
-Phase 4 (XGBoost).
+Final test evaluation remains pending until model, features, calibration and
+threshold are frozen under the Phase 4 protocol. Initial candidate validation
+is available through scripts/train_model.py.
 
 Usage:
     python scripts/evaluate_model.py
@@ -26,7 +26,7 @@ def main() -> int:
     # credit_risk.ml.registry.load_model_artifact, call
     # credit_risk.ml.evaluate.evaluate_model, and update docs/model_card.md.
     print(
-        "Model evaluation is implemented in roadmap Phase 4 (XGBoost). "
+        "Final test evaluation is not implemented; freeze Phase 4 selection first. "
         f"Configured model path: {Path(settings.model_path)}.",
         file=sys.stderr,
     )
