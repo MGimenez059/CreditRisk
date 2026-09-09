@@ -3,16 +3,16 @@
 A portfolio project for estimating loan default probability and demonstrating
 Data Science, ML Engineering, and Backend development with public tabular data.
 
-**Current status: Phase 4 initial candidate comparison implemented.** Ingestion,
-feature engineering, preprocessing and fixed Logistic Regression, Random Forest
-and XGBoost training are implemented. Cross-validation, tuning, probability
-calibration, SHAP explanations and an operational prediction API are still pending. See [ROADMAP.md](ROADMAP.md).
+**Current status: Phase 4 complete.** Grouped cross-validation, bounded Optuna
+tuning, calibration comparison and threshold selection are implemented. A selected
+XGBoost pipeline was frozen and evaluated once on test. SHAP explanations and an
+operational prediction API are still pending. See [ROADMAP.md](ROADMAP.md).
 
 ## Scope
 
 The MVP is a reproducible training workflow, an evaluated model, SHAP explanations,
 a FastAPI prediction endpoint, PostgreSQL prediction/model persistence, tests,
-Docker and CI. XGBoost is the next candidate to compare, not a predetermined winner.
+Docker and CI. XGBoost was selected from the documented comparison with both baselines.
 Customer/loan CRUD, a frontend and advanced infrastructure are outside the MVP.
 
 ## Architecture
@@ -56,19 +56,28 @@ SHA-256, split positions, seed, features, estimator parameters, dependency versi
 and validation metrics. It does not compute test predictions or test metrics.
 Use `--output models/baselines-v2` for another run; existing runs are not overwritten.
 
-Compare all three fixed candidates on the same grouped split:
+Phase 4 development selection (five grouped folds, 12 Optuna trials):
 
 ```bash
 uv run --locked python scripts/train_model.py
 ```
 
-This writes three complete pipelines, metadata, `run.json` and `validation.md` to
-`models/candidates-v1/`. Use `--output models/candidates-v2` for another run.
-XGBoost starts unweighted with 200 depth-3 trees and learning rate 0.05; the
-baselines retain their Phase 3 class weights. No tuning, early stopping, model
-promotion or test scoring occurs. See [candidate results](docs/candidate_results.json)
-and the [model card](docs/model_card.md) for the verified comparison.
-`scripts/evaluate_model.py` remains a placeholder until final selection is frozen.
+This creates `models/selected-v1/` with the selected raw-input pipeline,
+metadata, CV/trial evidence, protocol and frozen configuration. For another
+**development-only** run, choose a new `--output` directory. Existing runs are
+never overwritten. `--initial-only` retains the earlier fixed-candidate workflow.
+
+The final evaluation command is separate:
+
+```bash
+uv run --locked python scripts/evaluate_model.py --run models/selected-v1
+```
+
+**The recorded run has already been evaluated. Read its saved `test.json` or the
+[evaluation report](docs/evaluation_report.md); do not score it again.** The command
+refuses repeated attempts in that run. Final evaluation is for a newly frozen,
+not-yet-scored experiment under the [selection protocol](docs/selection_protocol.md).
+A new output directory does not make this dataset's test results unseen again.
 
 ## Model status
 
@@ -79,9 +88,11 @@ Median imputation and scaling are fitted only on training data, followed by
 one-hot encoding and classification. Derived features are inside the saved pipeline.
 
 Metrics: ROC-AUC, average precision (`pr_auc`), F1, precision, recall, log loss and
-Brier score. Threshold 0.5 is a baseline convention; calibration and threshold
-selection are Phase 4 work. The real-data grouped run was repeated with identical validation metrics and split
-assignments: see [model card](docs/model_card.md) and [run summary](docs/baseline_results.json).
+Brier score. Threshold 0.5 is a baseline convention. The selected XGBoost uses
+threshold 0.43; sigmoid calibration was evaluated and rejected on separate decision
+rows because it worsened log loss. Test ROC-AUC: 0.940042; F1: 0.798310.
+See [model card](docs/model_card.md), [evaluation report](docs/evaluation_report.md)
+and [machine-readable selection evidence](docs/selection_results.json).
 
 ## API contract (serving not yet complete)
 
@@ -129,8 +140,8 @@ docker compose up --build
 
 Compose defines PostgreSQL, a migration command and the API. No Alembic revisions
 exist yet, so `alembic upgrade head` currently creates no application tables.
-No production model is bundled, and SHAP is a placeholder: a running container
-does not yet mean predictions work. The configured artifact is selected through
+The selected model is a local artifact, not bundled in Git. SHAP is a placeholder:
+a running container does not yet mean predictions work. The configured artifact is selected through
 `MODEL_PATH`; `.env.example` lists the remaining configuration.
 
 ## Quality

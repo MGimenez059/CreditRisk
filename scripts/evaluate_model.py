@@ -1,36 +1,29 @@
 #!/usr/bin/env python3
-"""CLI entrypoint for standalone model evaluation.
+"""Evaluate the unchanged Phase 4 selection on test once; preserve the report."""
 
-Final test evaluation remains pending until model, features, calibration and
-threshold are frozen under the Phase 4 protocol. Initial candidate validation
-is available through scripts/train_model.py.
-
-Usage:
-    python scripts/evaluate_model.py
-"""
-
+import argparse
 import sys
 from pathlib import Path
 
-from credit_risk.config.settings import get_settings
+from credit_risk.exceptions import CreditRiskError
+from credit_risk.ml.final_evaluation import evaluate_frozen
 
 
 def main() -> int:
-    """Evaluate the active model artifact against the held-out test set.
-
-    Returns:
-        Process exit code: 0 on success, 1 if evaluation cannot proceed.
-    """
-    settings = get_settings()
-    # TODO(ROADMAP-P4): load the artifact at settings.model_path via
-    # credit_risk.ml.registry.load_model_artifact, call
-    # credit_risk.ml.evaluate.evaluate_model, and update docs/model_card.md.
-    print(
-        "Final test evaluation is not implemented; freeze Phase 4 selection first. "
-        f"Configured model path: {Path(settings.model_path)}.",
-        file=sys.stderr,
+    """Verify the frozen run and reject repeated test evaluation."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--input", type=Path, default=Path("data/interim/credit_risk_validated.parquet")
     )
-    return 1
+    parser.add_argument("--run", type=Path, default=Path("models/selected-v1"))
+    args = parser.parse_args()
+    try:
+        report = evaluate_frozen(args.input, args.run)
+    except (OSError, ValueError, KeyError, CreditRiskError) as err:
+        print(f"Final evaluation failed: {err}", file=sys.stderr)
+        return 1
+    print(f"Final test report: {report}")
+    return 0
 
 
 if __name__ == "__main__":

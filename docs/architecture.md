@@ -70,11 +70,23 @@ scaffolds, not a requirement to ingest the training CSV into PostgreSQL. Trainin
 uses Parquet. Only model and prediction persistence is required for the MVP; a model
 version alone is not enough to reconstruct an input that was never retained.
 
+## Phase 4 selection (implemented)
+
+`scripts/train_model.py` uses `ml.selection` and `ml.selection_cv` to compare weighted
+and unweighted candidates with five grouped folds inside the original training set.
+Twelve seeded Optuna trials tune XGBoost. `ml.calibration` fits a sigmoid on one
+half of validation and selects calibration/threshold on the other half. The final
+estimator remains fitted only on training rows. The selected run retained the base
+XGBoost probabilities, without sigmoid calibration.
+
+`ml.selection_state` records hashes and partitions in `frozen.json`.
+`scripts/evaluate_model.py` verifies that state before one test prediction pass;
+a persistent exclusive marker prevents accidental repetition within the run.
+`--initial-only` preserves the initial comparison through `ml.experiments`.
+See [protocol](selection_protocol.md) and [evaluation](evaluation_report.md).
+
 ## Remaining work
 
-`scripts/train_model.py` compares fixed XGBoost and baseline pipelines using
-`ml.experiments`, shared with the Phase 3 CLI. It records validation only and does
-not select a production model. Cross-validation, tuning and calibration remain
-pending. The final evaluation CLI and `ml.explain` are placeholders. Alembic has no revisions yet; Compose runs its migration command
-but creates no application tables. Integration tests and operational prediction
+`ml.explain` is still a placeholder. Alembic has no revisions yet; Compose runs
+its migration command but creates no application tables. Integration tests and operational prediction
 serving are not complete. Follow [ROADMAP.md](../ROADMAP.md), not file presence, for status.

@@ -1,8 +1,9 @@
 # CreditRisk — Work Roadmap
 
 This is the single source of phase status. A scaffold is not an operational feature.
-Phase 3 is complete. Two real-data runs reproduced identical grouped splits and
-validation metrics; test predictions/metrics were not computed.
+Phase 4 is complete. Grouped CV, bounded tuning, calibration comparison and
+threshold selection produced a frozen model, evaluated once on the original test.
+See [the evaluation report](docs/evaluation_report.md). Phase 5 is next.
 
 ## Phase 0 — Planning
 - [x] Define portfolio scope, target convention and non-goals.
@@ -35,14 +36,14 @@ validation metrics; test predictions/metrics were not computed.
 
 ## Phase 4 — Model Selection
 - [x] Train fixed XGBoost and compare it with both baselines on the same grouped validation split; publish the initial evidence.
-- [ ] Select the best justified candidate after cross-validation and tuning.
-- [ ] Group-aware cross-validation on development data; no duplicate groups across folds.
-- [ ] Bounded, seeded Optuna tuning after a stable XGBoost baseline exists.
-- [ ] Review loan_grade and loan_int_rate availability at the declared prediction time.
-- [ ] Evaluate probability calibration on data separate from estimator fitting.
-- [ ] State a demo decision objective and compare thresholds without using test results.
-- [ ] Freeze features, candidate, calibration and threshold, then evaluate the test set once.
-- [ ] Produce the selected artifact, configuration and complete evaluation report.
+- [x] Select the best justified candidate after cross-validation and tuning.
+- [x] Group-aware cross-validation on development data; no duplicate groups across folds.
+- [x] Bounded, seeded Optuna tuning after a stable XGBoost baseline exists.
+- [x] Review loan_grade and loan_int_rate availability at the declared prediction time.
+- [x] Evaluate probability calibration on data separate from estimator fitting.
+- [x] State a demo decision objective and compare thresholds without using test results.
+- [x] Freeze features, candidate, calibration and threshold, then evaluate the test set once.
+- [x] Produce the selected artifact, configuration and complete evaluation report.
 
 ## Phase 5 — Explainability
 - [ ] Global and local SHAP explanations for the selected model.

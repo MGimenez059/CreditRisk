@@ -1,8 +1,8 @@
 """Trains models for the credit default pipeline.
 
 `train_baseline` (roadmap Phase 3, Logistic Regression / Random Forest) is
-fully implemented. XGBoost is an initial Phase 4 candidate, not a selected
-production model.
+fully implemented. This module builds initial candidates; `ml.selection`
+compares, tunes and freezes the selected model under the Phase 4 protocol.
 
 Per CODESTYLE.md §14: `random_state=42` is set everywhere randomness is
 involved, and the trained pipeline is a single serializable artifact

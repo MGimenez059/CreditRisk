@@ -1,7 +1,7 @@
 # Model Card — CreditRisk
 
-**Status: initial Phase 4 candidate comparison run on 2026-09-09. Phase 3
-baselines reproduced; no production model has been selected.**
+**Status: Phase 4 complete, 2026-09-09. XGBoost selected, frozen and evaluated
+once on test. SHAP and operational serving remain pending.**
 
 ## Purpose and intended use
 
@@ -43,7 +43,7 @@ not compute test predictions or metrics. Historical full-data EDA was already vi
 so this is a held-out scoring partition, not a claim of completely unseen data.
 
 Both baselines use `class_weight="balanced"`; this is a baseline choice, not proof
-that weighting improves probability estimates. Phase 4 should compare alternatives.
+that weighting improves probability estimates. Phase 4 compared weighted and unweighted alternatives.
 F1/precision/recall use threshold 0.5. `pr_auc` means scikit-learn average precision,
 not trapezoidal integration. Brier score measures probabilistic error; inspect
 calibration curves separately before claiming calibrated probabilities.
@@ -111,17 +111,50 @@ See the [XGBoost parameter reference](https://xgboost.readthedocs.io/en/stable/p
 Random Forest retains higher ROC-AUC and average precision. XGBoost has lower
 log loss and Brier score, and higher precision but lower recall at threshold 0.5.
 These validation results do not establish calibration or a final winner.
-Cross-validation, weighting comparisons, tuning, calibration and threshold
-selection remain pending. Test predictions and metrics were not computed.
+At this initial stage, CV, weighting comparisons, tuning, calibration and
+threshold selection were pending; test had not yet been scored. The completed
+selection below supersedes these preliminary comparisons.
 
-## Model selection, calibration and explanations
+## Final selection and test evaluation
 
-XGBoost is an initial Phase 4 candidate compared against these baselines under
-a common split and preprocessing protocol. Selection must consider discrimination, probability quality and complexity.
-The selected model may be Random Forest if it is better justified.
-Calibrate using development data separate from fitting the estimator; freeze all
-choices before final test scoring. A demo threshold objective remains to be stated.
-Risk-score bands are illustrative presentation categories, not validated decisions.
+The [selection protocol](selection_protocol.md) was fixed before CV/tuning and test
+scoring. Five grouped folds within original training compared weighted/unweighted
+Logistic Regression, Random Forest and XGBoost. Twelve sequential Optuna trials
+selected XGBoost trial 6 (CV ROC-AUC 0.933849). Other model families were outside
+the fixed 0.002 ROC-AUC tolerance; probability metrics supported the same choice.
+
+The base estimator uses 200 depth-5 trees, learning rate 0.1407256738281049,
+min_child_weight=1, scale_pos_weight=1, CPU hist, one thread and seed 42.
+It fitted 22,811 training rows. Validation groups were split into 2,449 calibration
+and 2,440 decision rows. Sigmoid calibration was rejected: decision log loss rose
+from 0.201327 to 0.208473 and Brier score from 0.056903 to 0.058168.
+
+Threshold **0.43** maximized decision-set F1 on the fixed grid. The model was not
+refitted after choosing calibration/threshold. Display risk bands remain separate.
+This threshold is a portfolio objective, not a lending policy.
+
+The original **4,874 test rows were scored once**, after the artifact, threshold,
+features and calibration were frozen and their hashes verified:
+
+| Test metric | Value |
+|---|---:|
+| roc_auc | 0.940042 |
+| pr_auc | 0.884125 |
+| f1 | 0.798310 |
+| log_loss | 0.212963 |
+| brier_score | 0.061381 |
+| precision | 0.909747 |
+| recall | 0.711195 |
+
+Artifact: `models/selected-v1/model.joblib` (version `selected-v1`), with metadata
+in `model.json`. The artifact contains the full raw-input pipeline. Its metadata
+metrics are explicitly from decision rows; final test metrics are in `test.json`.
+See the [complete evaluation report](evaluation_report.md),
+[reliability curves](calibration_curves.svg) and [run evidence](selection_results.json).
+CV and decision scores were used for selection and may be optimistic. Final test
+results are now known and cannot be treated as unseen in subsequent development.
+
+## Explanations
 
 SHAP is pending Phase 5. Specify output space, base value and encoded-feature
 aggregation. XGBoost raw SHAP values are log-odds, not probability increments; explain

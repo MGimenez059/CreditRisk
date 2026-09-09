@@ -1,11 +1,9 @@
-"""Evaluates a trained pipeline against a held-out split.
-
-Metrics computed here populate `docs/model_card.md` and (once Phase 4
-trains the production model) the `metrics` recorded in `ModelArtifactMetadata`.
-"""
+"""Compute labeled validation or final-test metrics at an explicit threshold."""
 
 from dataclasses import dataclass
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
@@ -19,11 +17,7 @@ from sklearn.metrics import (
 
 from credit_risk.ml.protocols import FittedPipeline
 
-# Baseline models (roadmap Phase 3) report F1 at this fixed threshold for a
-# simple, comparable sanity check across Logistic Regression and Random
-# Forest. Per SPECS.md §17, the *production* model's decision threshold
-# (Phase 4, XGBoost) is selected against a business objective, not this
-# default — this constant is not that threshold.
+# Baselines use 0.5; the selected model stores its development-selected threshold.
 DEFAULT_CLASSIFICATION_THRESHOLD = 0.5
 
 
@@ -35,7 +29,7 @@ class EvaluationReport:
         roc_auc: Area under the ROC curve — discrimination, threshold-independent.
         pr_auc: Average precision (non-interpolated PR summary) — more informative
             than ROC-AUC alone on an imbalanced target (SPECS.md §11).
-        f1: F1 score at `DEFAULT_CLASSIFICATION_THRESHOLD`.
+        f1: F1 score at the supplied classification threshold.
         log_loss: Cross-entropy loss on the predicted probabilities.
         brier_score: Mean squared error between predicted probability and
             the true label — a calibration signal, not just discrimination.
@@ -54,6 +48,7 @@ def evaluate_model(
     pipeline: FittedPipeline,
     holdout_features: pd.DataFrame,
     holdout_target: pd.Series,
+    threshold: float = DEFAULT_CLASSIFICATION_THRESHOLD,
 ) -> EvaluationReport:
     """Score a fitted pipeline against a held-out validation or test set.
 
@@ -61,6 +56,7 @@ def evaluate_model(
         pipeline: A fitted scikit-learn-compatible pipeline.
         holdout_features: Feature frame not used during training.
         holdout_target: True `loan_status` labels aligned with `holdout_features`.
+        threshold: Frozen classification threshold; baseline default is 0.5.
 
     Returns:
         The full set of metrics tracked in README.md's Model section.
@@ -68,7 +64,18 @@ def evaluate_model(
         as a primary metric for an imbalanced target.
     """
     probabilities = pipeline.predict_proba(holdout_features)[:, 1]
-    predictions = (probabilities >= DEFAULT_CLASSIFICATION_THRESHOLD).astype(int)
+    return evaluate_probabilities(holdout_target, probabilities, threshold)
+
+
+def evaluate_probabilities(
+    holdout_target: pd.Series,
+    probabilities: npt.NDArray[np.float64],
+    threshold: float = DEFAULT_CLASSIFICATION_THRESHOLD,
+) -> EvaluationReport:
+    """Compute metrics from one prediction pass at an explicit threshold."""
+    if not 0 <= threshold <= 1:
+        raise ValueError("Threshold must be between 0 and 1.")
+    predictions = (probabilities >= threshold).astype(int)
 
     return EvaluationReport(
         roc_auc=float(roc_auc_score(holdout_target, probabilities)),

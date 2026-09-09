@@ -84,3 +84,13 @@ leakage. Reassess both fields under a pre-pricing use case.
 
 Identical raw model inputs form one split group, including conflicting target labels.
 This preserves rows while preventing duplicate inputs from crossing evaluation boundaries.
+
+## Phase 4 feature review (2026-09-09)
+
+Reviewed the recorded source metadata and the declared priced-offer scenario.
+Keep `loan_grade` excluded because neither its derivation nor timing is verified.
+Keep `loan_int_rate` under the explicit assumption that an offer rate is known,
+or explicitly null, when scoring. No upstream timing guarantees were found in
+the recorded provenance. This closes the demo feature choice, while preserving
+that limitation; it does not validate a pre-pricing application model.
+The nine raw inputs and three derived features remain unchanged.

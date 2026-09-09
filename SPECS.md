@@ -100,9 +100,10 @@ historical numbers must not be reused as new-protocol results.
 Train XGBClassifier as the next candidate, with a fixed seed and a modest initial
 configuration. Compare against both baselines; choose the best justified model,
 considering discrimination, probability quality and complexity. Do not require
-XGBoost to win to satisfy the project goal. The initial `scripts/train_model.py`
-comparison uses the Phase 3 split and shared preprocessing; it writes all candidate
-artifacts to a fresh directory without selecting a production model or scoring test.
+XGBoost to win to satisfy the project goal. The `scripts/train_model.py --initial-only`
+comparison preserves the Phase 3 split and shared preprocessing. The default CLI
+performs selection and freezing under [the selection protocol](docs/selection_protocol.md);
+final test evaluation is a separate guarded command.
 
 ## 14. Hyperparameter Optimization
 
@@ -114,7 +115,7 @@ optimize against the test set.
 ## 15. Cross Validation
 
 Use group-aware stratified CV on development data, preserving the Phase 3 grouping.
-Start with five folds when group/class counts allow. Fit preprocessing inside each
+Use five folds within the original training partition when group/class counts allow. Fit preprocessing inside each
 fold. Report mean and standard deviation for discrimination/probability metrics;
 threshold metrics must state the threshold. Ordinary StratifiedKFold alone does
 not protect duplicate groups.
@@ -128,9 +129,9 @@ not a standalone proof of calibration. Accuracy is not the primary metric.
 
 ## 17. Decision Threshold
 
-Use 0.5 for comparable baseline F1/precision/recall. In Phase 4 state a portfolio
-demo objective, compare thresholds on development data and freeze the chosen value
-before final test scoring. No claim that an arbitrary threshold is a lending policy.
+Use 0.5 for comparable baseline F1/precision/recall. The Phase 4 demo maximizes
+F1 on decision rows over 0.05..0.95 in steps of 0.01, breaking ties by precision
+then higher threshold. Freeze this choice before final test scoring. No claim that an arbitrary threshold is a lending policy.
 
 ## 18. Risk Score
 
@@ -316,3 +317,6 @@ an actual requirement justifies it; no speculative feature-store architecture.
 
 Prioritize reproducibility, data quality, correct evaluation, explainability,
 maintainable code, testing and incremental delivery.
+
+Phase 4 partition roles, calibration selection, tuning budget and final-evaluation
+guards are specified in [the selection protocol](docs/selection_protocol.md).

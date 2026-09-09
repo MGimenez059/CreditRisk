@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 """Train and record both baselines without evaluating the test split."""
 
 import argparse

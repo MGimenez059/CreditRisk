@@ -26,7 +26,7 @@ class Settings(BaseSettings):
         database_echo: Whether SQLAlchemy logs every emitted SQL statement.
         model_path: Filesystem path to the serialized inference pipeline.
         model_name: Registered name of the active model, echoed in responses.
-        model_version: Semantic version of the active model artifact.
+        model_version: Fallback artifact version; loaded metadata owns actual identity.
         max_batch_size: Upper bound on records accepted per batch request.
     """
 
@@ -46,9 +46,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://creditrisk:creditrisk@localhost:5432/creditrisk"
     database_echo: bool = False
 
-    model_path: str = "models/credit_risk_xgboost_v1.joblib"
+    model_path: str = "models/selected-v1/model.joblib"
     model_name: str = "credit-risk-xgboost"
-    model_version: str = "1.0.0"
+    model_version: str = "selected-v1"
 
     max_batch_size: int = 500
 

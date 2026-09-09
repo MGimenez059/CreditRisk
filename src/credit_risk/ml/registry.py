@@ -26,7 +26,7 @@ class ModelArtifactMetadata:
 
     Attributes:
         name: Registered model name (e.g. "credit-risk-xgboost").
-        version: Semantic version of this artifact.
+        version: Version identifier of this artifact (selected runs use the run name).
         algorithm: Human-readable algorithm identifier (e.g. "XGBoost").
         dataset_version: Identifier of the training dataset snapshot used.
         feature_version: Identifier of the feature engineering version used.
@@ -43,6 +43,9 @@ class ModelArtifactMetadata:
     trained_at: datetime
     python_version: str = "unknown"
     dependency_versions: dict[str, str] = field(default_factory=dict)
+    threshold: float = 0.5
+    calibration: str = "none"
+    metrics_partition: str = "validation"
 
 
 @dataclass(frozen=True)
