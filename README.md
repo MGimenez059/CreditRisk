@@ -3,10 +3,10 @@
 A portfolio project for estimating loan default probability and demonstrating
 Data Science, ML Engineering, and Backend development with public tabular data.
 
-**Current status: Phase 4 complete.** Grouped cross-validation, bounded Optuna
+**Current status: Phase 5 complete.** Grouped cross-validation, bounded Optuna
 tuning, calibration comparison and threshold selection are implemented. A selected
-XGBoost pipeline was frozen and evaluated once on test. SHAP explanations and an
-operational prediction API are still pending. See [ROADMAP.md](ROADMAP.md).
+XGBoost pipeline was frozen and evaluated once on test. Global and local SHAP
+explanations are implemented; operational prediction serving remains pending. See [ROADMAP.md](ROADMAP.md).
 
 ## Scope
 
@@ -126,7 +126,8 @@ The intended response includes probability, score, level, model name/version and
 SHAP contributions. `risk_score = round(default_probability * 100)`;
 0–30 LOW, 31–70 MEDIUM, 71–100 HIGH, based on the rounded score.
 These illustrative categories are separate from a classification threshold.
-SHAP units/base value and the relationship to calibration must be finalized in Phase 5.
+The explanation object includes its base, raw output and all grouped contributions
+in log-odds. See [explainability](docs/explainability.md) for semantics and plots.
 
 ## Local service and Docker
 
@@ -140,8 +141,9 @@ docker compose up --build
 
 Compose defines PostgreSQL, a migration command and the API. No Alembic revisions
 exist yet, so `alembic upgrade head` currently creates no application tables.
-The selected model is a local artifact, not bundled in Git. SHAP is a placeholder:
-a running container does not yet mean predictions work. The configured artifact is selected through
+The selected model is a local artifact, not bundled in Git. SHAP is implemented,
+but migrations and transaction integration remain pending: a running container
+does not yet mean predictions work. The configured artifact is selected through
 `MODEL_PATH`; `.env.example` lists the remaining configuration.
 
 ## Quality
@@ -151,6 +153,14 @@ uv run --locked ruff format --check .
 uv run --locked ruff check .
 uv run --locked mypy src scripts
 uv run --locked pytest
+```
+
+If Windows denies access to `Temp/pytest-of-<user>`, use a fresh test directory
+inside the ignored `.pytest-tmp/` folder. In PowerShell:
+
+```powershell
+$testTemp = ".pytest-tmp/run-" + [guid]::NewGuid().ToString("N")
+uv run --locked pytest --basetemp=$testTemp
 ```
 
 GitHub Actions runs quality checks and a Docker build for pushes to `main` and

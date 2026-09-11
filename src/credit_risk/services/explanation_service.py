@@ -1,44 +1,50 @@
-"""Orchestrates per-prediction explanations.
-
-Delegates the actual SHAP computation to `credit_risk.ml.explain`, which is
-implemented in roadmap Phase 5. This service owns the mapping from raw SHAP
-output to the API's `FeatureContribution` shape.
-"""
+"""Map model explanations into domain objects shared with the response boundary."""
 
 from dataclasses import dataclass
 from typing import Literal
 
 import pandas as pd
 
+from credit_risk.ml.explain import explain_prediction
+from credit_risk.ml.protocols import FittedPipeline
+
 
 @dataclass(frozen=True)
 class FeatureContribution:
-    """One feature's contribution to a single prediction."""
+    """Signed impact in log-odds, not probability percentage points."""
 
     feature: str
     impact: float
-    direction: Literal["positive", "negative"]
+    direction: Literal["positive", "negative", "neutral"]
+
+
+@dataclass(frozen=True)
+class Explanation:
+    """Complete additive explanation of the uncalibrated model output."""
+
+    base_value: float
+    output_value: float
+    contributions: list[FeatureContribution]
+    output_space: Literal["log_odds"] = "log_odds"
+    method: Literal["tree_path_dependent"] = "tree_path_dependent"
+    explains: Literal["uncalibrated_model"] = "uncalibrated_model"
 
 
 class ExplanationService:
-    """Produces ranked feature contributions for a single prediction."""
+    """Use the same loaded pipeline as prediction, avoiding model identity drift."""
 
-    def explain(self, features: pd.DataFrame) -> list[FeatureContribution]:
-        """Return the top feature contributions for a single-row feature frame.
-
-        Args:
-            features: A single-row DataFrame in the exact column order the
-                active model was trained on.
-
-        Returns:
-            Feature contributions ordered by descending absolute impact.
-
-        Raises:
-            ExplanationError: If the SHAP explainer cannot be built or fails
-                to produce values for the given input.
-        """
-        # TODO(ROADMAP-P5): delegate to credit_risk.ml.explain once the SHAP
-        # explainer is implemented.
-        raise NotImplementedError(
-            "Explanation generation is implemented in roadmap Phase 5 (Explicabilidad)."
+    def explain(self, pipeline: FittedPipeline, features: pd.DataFrame) -> Explanation:
+        """Return all grouped impacts, ranked by absolute magnitude."""
+        result = explain_prediction(pipeline, features)
+        return Explanation(
+            result.base_value,
+            result.output_value,
+            [
+                FeatureContribution(
+                    name,
+                    impact,
+                    "positive" if impact > 0 else "negative" if impact < 0 else "neutral",
+                )
+                for name, impact in result.contributions
+            ],
         )

@@ -54,9 +54,23 @@ class ModelInfo(BaseModel):
 class FeatureContribution(BaseModel):
     """A single feature's SHAP contribution to one prediction."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     feature: str
     impact: float
-    direction: Literal["positive", "negative"]
+    direction: Literal["positive", "negative", "neutral"]
+
+
+class ExplanationResponse(BaseModel):
+    """All impacts plus base reconstruct output_value; sigmoid gives probability."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+    base_value: float
+    output_value: float
+    output_space: Literal["log_odds"]
+    method: Literal["tree_path_dependent"]
+    explains: Literal["uncalibrated_model"]
+    contributions: list[FeatureContribution]
 
 
 class PredictionResponse(BaseModel):
@@ -66,7 +80,7 @@ class PredictionResponse(BaseModel):
     risk_score: int = Field(..., ge=0, le=100)
     risk_level: RiskLevel
     model: ModelInfo
-    explanation: list[FeatureContribution]
+    explanation: ExplanationResponse
 
 
 class BatchPredictionResponse(BaseModel):

@@ -1,7 +1,7 @@
 # Model Card — CreditRisk
 
 **Status: Phase 4 complete, 2026-09-09. XGBoost selected, frozen and evaluated
-once on test. SHAP and operational serving remain pending.**
+once on test. Phase 5 SHAP is complete; operational serving remains pending.**
 
 ## Purpose and intended use
 
@@ -156,10 +156,12 @@ results are now known and cannot be treated as unseen in subsequent development.
 
 ## Explanations
 
-SHAP is pending Phase 5. Specify output space, base value and encoded-feature
-aggregation. XGBoost raw SHAP values are log-odds, not probability increments; explain
-whether values refer to the base estimator or calibrated predictor. See
-[TreeExplainer documentation](https://shap.readthedocs.io/en/stable/generated/shap.TreeExplainer.html).
+Tree SHAP explains the frozen uncalibrated XGBoost margin in log-odds.
+One-hot impacts are summed by source field; derived numeric variables remain
+separate. Base plus all impacts reconstructs the margin, whose sigmoid matches
+pipeline probability. These are model attributions, not causal effects.
+See [the explanation report](explainability.md) for the fixed 500-row development
+sample, global summary, synthetic example and reconstruction checks.
 
 ## Limitations and bias considerations
 

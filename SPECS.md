@@ -27,7 +27,7 @@ DuckDB or a frontend framework without a use case.
 ## 4. Repository Structure
 
 `src/credit_risk/` contains api, schemas, services, repositories, db, ml and config.
-`scripts/` holds ingestion, baseline and future selected-model CLIs. `tests/`,
+`scripts/` holds ingestion, training, evaluation and explanation CLIs. `tests/`,
 `notebooks/`, `docs/`, `models/` and `data/` have distinct purposes. Do not create
 placeholder directories or notebooks merely to reproduce an illustrative tree.
 
@@ -144,8 +144,10 @@ of the classification threshold and are not an industry credit score.
 Phase 5: global importance, summary plot and local contributions. Define SHAP
 output space, base value, encoded-feature aggregation and additivity checks.
 XGBoost raw values are log-odds; do not label them probability increments.
-If calibration is used, state whether the explanation describes the base estimator
-or calibrated predictor. Finalize the response schema against that decision.
+The selected uncalibrated model uses tree_path_dependent Tree SHAP. Return the
+base, raw output, method, output space and all grouped contributions as specified
+in [explainability](docs/explainability.md). Calibrated wrappers are rejected until
+a contract for their output is implemented. Explanations are not causal effects.
 
 ## 20. Prediction API
 

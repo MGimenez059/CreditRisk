@@ -57,7 +57,7 @@ class Prediction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     prediction_version: Mapped[str] = mapped_column(String(32), nullable=False)
     latency_ms: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
-    explanation: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    explanation: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
 
     customer: Mapped["Customer | None"] = relationship()
     model: Mapped["ModelMetadata"] = relationship()

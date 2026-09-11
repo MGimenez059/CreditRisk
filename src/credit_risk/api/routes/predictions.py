@@ -1,5 +1,6 @@
 """Prediction endpoints: single and batch."""
 
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -9,7 +10,7 @@ from credit_risk.config.settings import Settings, get_settings
 from credit_risk.exceptions import BatchSizeExceededError
 from credit_risk.schemas.prediction import (
     BatchPredictionResponse,
-    FeatureContribution,
+    ExplanationResponse,
     ModelInfo,
     PredictionRequest,
     PredictionResponse,
@@ -26,14 +27,7 @@ def _to_response(result: PredictionResult) -> PredictionResponse:
         risk_score=result.risk_score,
         risk_level=result.risk_level,
         model=ModelInfo(name=result.model_name, version=result.model_version),
-        explanation=[
-            FeatureContribution(
-                feature=contribution.feature,
-                impact=contribution.impact,
-                direction=contribution.direction,
-            )
-            for contribution in result.explanation
-        ],
+        explanation=ExplanationResponse.model_validate(asdict(result.explanation)),
     )
 
 

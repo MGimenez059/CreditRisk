@@ -3,7 +3,7 @@
 This is the single source of phase status. A scaffold is not an operational feature.
 Phase 4 is complete. Grouped CV, bounded tuning, calibration comparison and
 threshold selection produced a frozen model, evaluated once on the original test.
-See [the evaluation report](docs/evaluation_report.md). Phase 5 is next.
+See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete; see [explainability](docs/explainability.md). Phase 6 is next.
 
 ## Phase 0 — Planning
 - [x] Define portfolio scope, target convention and non-goals.
@@ -46,10 +46,10 @@ See [the evaluation report](docs/evaluation_report.md). Phase 5 is next.
 - [x] Produce the selected artifact, configuration and complete evaluation report.
 
 ## Phase 5 — Explainability
-- [ ] Global and local SHAP explanations for the selected model.
-- [ ] Define base value, output units and aggregation of encoded features.
-- [ ] Explain explicitly whether SHAP describes raw model output or the calibrated predictor.
-- [ ] Finalize explanation response schema and verify additivity in the declared output space.
+- [x] Global and local SHAP explanations for the selected model.
+- [x] Define base value, output units and aggregation of encoded features.
+- [x] Explain explicitly whether SHAP describes raw model output or the calibrated predictor.
+- [x] Finalize explanation response schema and verify additivity in the declared output space.
 
 ## Phase 6 — Backend
 - [x] FastAPI route/service/repository and ORM scaffolds exist.

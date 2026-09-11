@@ -68,7 +68,7 @@ def test_prediction_constructs_with_model_id_and_customer_id() -> None:
         risk_level=RiskLevel.LOW,
         prediction_version="1.0.0",
         latency_ms=12.3,
-        explanation=[],
+        explanation={"output_space": "log_odds", "contributions": []},
     )
 
     assert prediction.customer_id is None

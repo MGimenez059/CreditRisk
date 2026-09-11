@@ -104,7 +104,7 @@ exclude = ["alembic/"]
 
 [[tool.mypy.overrides]]
 # These imported libraries do not provide the typing metadata MyPy needs.
-module = ["sklearn.*", "joblib.*"]
+module = ["sklearn.*", "joblib.*", "shap.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------

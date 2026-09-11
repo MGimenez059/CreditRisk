@@ -7,7 +7,7 @@ CODESTYLE.md §3.
 
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -25,7 +25,7 @@ from credit_risk.repositories.interfaces import (
     PredictionRepositoryProtocol,
 )
 from credit_risk.schemas.prediction import PredictionRequest
-from credit_risk.services.explanation_service import ExplanationService, FeatureContribution
+from credit_risk.services.explanation_service import Explanation, ExplanationService
 from credit_risk.services.risk_service import calculate_risk_score
 
 logger = structlog.get_logger(__name__)
@@ -40,7 +40,7 @@ class PredictionResult:
     risk_level: Literal["LOW", "MEDIUM", "HIGH"]
     model_name: str
     model_version: str
-    explanation: list[FeatureContribution]
+    explanation: Explanation
 
 
 class PredictionService:
@@ -93,7 +93,7 @@ class PredictionService:
 
         default_probability = ml_predict.predict(artifact.pipeline, features)
         risk = calculate_risk_score(default_probability)
-        explanation = self._explanation_service.explain(features)
+        explanation = self._explanation_service.explain(artifact.pipeline, features)
 
         latency_ms = (time.perf_counter() - started_at) * 1000
 
@@ -107,7 +107,7 @@ class PredictionService:
                 risk_level=risk.level,
                 prediction_version=model_row.version,
                 latency_ms=latency_ms,
-                explanation=[contribution.__dict__ for contribution in explanation],
+                explanation=asdict(explanation),
             )
         )
 

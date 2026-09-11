@@ -44,7 +44,7 @@ and artifacts are local outputs; publish reviewed validation summaries in the mo
 POST /api/v1/predictions -> PredictionRequest
  -> PredictionService -> explicit API-to-source mapping
  -> saved pipeline -> probability -> risk score
- -> SHAP (pending) -> prediction repository -> response
+ -> SHAP (implemented) -> prediction repository -> response
 ```
 
 `previous_defaults` is required and restricted to 0/1, translated to N/Y. Four
@@ -87,6 +87,9 @@ See [protocol](selection_protocol.md) and [evaluation](evaluation_report.md).
 
 ## Remaining work
 
-`ml.explain` is still a placeholder. Alembic has no revisions yet; Compose runs
+`ml.explain` now computes grouped Tree SHAP in log-odds and checks additivity
+against both the raw margin and pipeline probability. The service passes the same
+loaded pipeline to inference and explanation. See [explainability](explainability.md).
+Alembic has no revisions yet; Compose runs
 its migration command but creates no application tables. Integration tests and operational prediction
 serving are not complete. Follow [ROADMAP.md](../ROADMAP.md), not file presence, for status.
