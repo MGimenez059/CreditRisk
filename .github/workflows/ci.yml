@@ -28,6 +28,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+psycopg://creditrisk:creditrisk@localhost:5432/creditrisk_test
+      TEST_DATABASE_URL: postgresql+psycopg://creditrisk:creditrisk@localhost:5432/creditrisk_test
       APP_ENV: test
 
     steps:

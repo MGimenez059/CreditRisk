@@ -68,5 +68,5 @@ def create_batch_prediction(
             f"Batch size {len(payload)} exceeds the maximum of {settings.max_batch_size}."
         )
 
-    results = [prediction_service.predict(item) for item in payload]
+    results = prediction_service.predict_batch(payload)
     return BatchPredictionResponse(results=[_to_response(result) for result in results])

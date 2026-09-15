@@ -3,7 +3,7 @@
 This is the single source of phase status. A scaffold is not an operational feature.
 Phase 4 is complete. Grouped CV, bounded tuning, calibration comparison and
 threshold selection produced a frozen model, evaluated once on the original test.
-See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete; see [explainability](docs/explainability.md). Phase 6 is next.
+See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete; see [explainability](docs/explainability.md). Phase 6 is complete; see [backend verification](docs/backend.md). Phase 7 is next.
 
 ## Phase 0 — Planning
 - [x] Define portfolio scope, target convention and non-goals.
@@ -54,10 +54,10 @@ See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete
 ## Phase 6 — Backend
 - [x] FastAPI route/service/repository and ORM scaffolds exist.
 - [x] Prediction request maps available dataset fields to the raw model schema.
-- [ ] Implement Alembic revisions for the MVP prediction/model persistence flow.
-- [ ] Complete artifact loading, SHAP orchestration and transaction behavior.
-- [ ] Ensure model selection and stored model metadata agree.
-- [ ] Exercise single/batch requests against a dedicated PostgreSQL test database.
+- [x] Implement Alembic revisions for the MVP prediction/model persistence flow.
+- [x] Complete artifact loading, SHAP orchestration and transaction behavior.
+- [x] Ensure model selection and stored model metadata agree.
+- [x] Exercise single/batch requests against a dedicated PostgreSQL test database.
 
 ## Phase 7 — Packaging
 - [x] Dockerfile, Compose and migration startup command exist.
@@ -67,12 +67,12 @@ See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete
 
 ## Phase 8 — Testing & Quality
 - [x] Unit tests for data, feature engineering, preprocessing, baselines and risk scoring.
-- [ ] Database integration tests and complete prediction-service failure coverage.
+- [x] Database integration tests and complete prediction-service failure coverage.
 - [x] Reproduce baseline training twice from the locked environment and pinned input snapshot.
 
 ## Phase 9 — CI
 - [x] Workflow runs Ruff, MyPy, Pytest and Docker build.
-- [ ] Include the operational database integration path once Phase 6 is complete.
+- [x] Include the operational database integration path once Phase 6 is complete.
 
 ## Phase 10 — Documentation & Portfolio
 - [x] Separate implemented behavior from planned features; remove duplicate phase lists.

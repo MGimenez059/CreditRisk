@@ -155,7 +155,14 @@ Root liveness: GET /health. Under `/api/v1`: GET /models/active, POST /predictio
 and POST /predictions/batch. See README for a request using only supported fields.
 Batch input is a JSON array; output wraps predictions in `results`.
 Results identify the actual artifact's name/version. Customer CRUD is outside MVP.
-The current route scaffolds do not mean operational inference is complete.
+Serving uses one configured artifact per single/batch request. Batches require
+1..MAX_BATCH_SIZE items, preserve order and commit atomically. Missing artifacts
+return 404; invalid/incompatible artifacts and explanation failures return 500;
+database failures return 503 with a generic message. No success response precedes commit.
+`GET /models/active` reconciles the configured artifact with the registry and
+returns its metadata, including calibration, threshold and metrics partition.
+This may lazily register/activate the artifact; `MODEL_PATH` remains authoritative.
+All workers sharing a registry must use the same deployment configuration.
 
 ## 21. API Validation
 

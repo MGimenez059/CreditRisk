@@ -38,13 +38,13 @@ Python/dependency versions, seed, hyperparameters and row-position split assignm
 The test partition is allocated but never scored by this command. JSON manifests
 and artifacts are local outputs; publish reviewed validation summaries in the model card.
 
-## Request flow (partially implemented)
+## Request flow (implemented)
 
 ```text
 POST /api/v1/predictions -> PredictionRequest
  -> PredictionService -> explicit API-to-source mapping
  -> saved pipeline -> probability -> risk score
- -> SHAP (implemented) -> prediction repository -> response
+ -> SHAP -> transaction: model registration + predictions -> commit -> response
 ```
 
 `previous_defaults` is required and restricted to 0/1, translated to N/Y. Four
@@ -58,12 +58,18 @@ threadpool. Async SQLAlchemy is not required for this MVP. See
 
 ## Persistence and artifacts
 
-`MODEL_PATH` selects the operational artifact. A JSON sidecar identifies its model
-and data/feature versions. The service resolves a matching models-table row before
-storing predictions. The `is_active` database flag is scaffold state, not the serving
-selector; Phase 6 must make promotion and transaction behavior consistent.
-Loading/registration currently happens per request; lifecycle loading can be addressed
-when completing serving, with tests for missing or incompatible artifacts.
+`MODEL_PATH` selects the artifact. Each single/batch request loads it once; prediction
+and SHAP share that pipeline. Byte hashes detect changes during loading and reuse
+of an existing name/version with different content. Stored JSON preserves all
+sidecar metadata, including calibration, threshold and metric partition.
+Frozen artifacts are checked against their saved artifact/sidecar hashes.
+
+Services own `Session.begin()`; repositories only query/flush. A transaction-level
+PostgreSQL advisory lock serializes registry registration and activation; a unique
+partial index permits at most one active model. Inference happens before the lock.
+Any insert/commit failure rolls back the entire batch and any activation changes.
+`GET /models/active` also reconciles the configured artifact, allowing lazy registration.
+All workers in one deployment must share MODEL_PATH and immutable artifact contents.
 
 Predictions can be anonymous. Customer, Loan and CreditHistory are optional retained
 scaffolds, not a requirement to ingest the training CSV into PostgreSQL. Training
@@ -90,6 +96,9 @@ See [protocol](selection_protocol.md) and [evaluation](evaluation_report.md).
 `ml.explain` now computes grouped Tree SHAP in log-odds and checks additivity
 against both the raw margin and pipeline probability. The service passes the same
 loaded pipeline to inference and explanation. See [explainability](explainability.md).
-Alembic has no revisions yet; Compose runs
-its migration command but creates no application tables. Integration tests and operational prediction
-serving are not complete. Follow [ROADMAP.md](../ROADMAP.md), not file presence, for status.
+Alembic revision `0001` creates the persistence schema, including the retained
+customer/loan/history tables required by existing ORM relationships. Their CRUD
+routes remain disabled. PostgreSQL integration tests verify commits, rollback,
+concurrent registration, identity conflicts and migration upgrade/downgrade.
+See [backend verification](backend.md). Clean-container prediction and complete
+readiness/correlation remain Phase 7 work in [ROADMAP.md](../ROADMAP.md).

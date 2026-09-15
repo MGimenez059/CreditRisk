@@ -7,6 +7,7 @@ these exceptions themselves, per CODESTYLE.md §9.
 import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from credit_risk.exceptions import (
     BatchSizeExceededError,
@@ -43,3 +44,12 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=status_code,
         )
         return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+
+    @app.exception_handler(SQLAlchemyError)
+    async def handle_database_error(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+        logger.error(
+            "database_request_failed", path=request.url.path, exception_type=type(exc).__name__
+        )
+        return JSONResponse(
+            status_code=503, content={"detail": "Prediction storage is unavailable."}
+        )

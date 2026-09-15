@@ -29,6 +29,14 @@ class PredictionRepositoryProtocol(Protocol):
 class ModelRepositoryProtocol(Protocol):
     """Persists and retrieves trained-model metadata (the model registry)."""
 
+    def lock_registry(self) -> None:
+        """Acquire the transaction-scoped registry lock."""
+        ...
+
+    def activate(self, model: ModelMetadata) -> None:
+        """Make this the sole active model while holding the registry lock."""
+        ...
+
     def get_active(self) -> ModelMetadata | None:
         """Return the currently active model's metadata, or None if unset."""
         ...

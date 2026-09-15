@@ -1,6 +1,6 @@
 """SQLAlchemy implementation of `ModelRepositoryProtocol`."""
 
-from sqlalchemy import select
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from credit_risk.db.models.model import ModelMetadata
@@ -35,3 +35,15 @@ class SQLAlchemyModelRepository:
         self._session.add(model)
         self._session.flush()
         return model
+
+    def lock_registry(self) -> None:
+        """Serialize registration and activation until the enclosing transaction ends."""
+        self._session.execute(text("SELECT pg_advisory_xact_lock(734621)"))
+
+    def activate(self, model: ModelMetadata) -> None:
+        """Promote the configured artifact atomically while holding the registry lock."""
+        self._session.execute(
+            update(ModelMetadata).where(ModelMetadata.id != model.id).values(is_active=False)
+        )
+        model.is_active = True
+        self._session.flush()

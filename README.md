@@ -3,10 +3,10 @@
 A portfolio project for estimating loan default probability and demonstrating
 Data Science, ML Engineering, and Backend development with public tabular data.
 
-**Current status: Phase 5 complete.** Grouped cross-validation, bounded Optuna
+**Current status: Phase 6 complete.** Grouped cross-validation, bounded Optuna
 tuning, calibration comparison and threshold selection are implemented. A selected
 XGBoost pipeline was frozen and evaluated once on test. Global and local SHAP
-explanations are implemented; operational prediction serving remains pending. See [ROADMAP.md](ROADMAP.md).
+explanations and transactional PostgreSQL prediction serving are implemented. See [ROADMAP.md](ROADMAP.md).
 
 ## Scope
 
@@ -23,7 +23,7 @@ Public CSV -> validation/report -> validated Parquet
   -> raw inputs -> derived features -> preprocessing -> estimator
   -> validation metrics + pipeline artifact + run manifest
 
-Planned serving:
+Serving:
 FastAPI -> request-to-source mapping -> same pipeline -> probability/risk score
   -> SHAP -> PostgreSQL -> response
 ```
@@ -94,9 +94,9 @@ rows because it worsened log loss. Test ROC-AUC: 0.940042; F1: 0.798310.
 See [model card](docs/model_card.md), [evaluation report](docs/evaluation_report.md)
 and [machine-readable selection evidence](docs/selection_results.json).
 
-## API contract (serving not yet complete)
+## API contract
 
-Liveness is `GET /health` at the root. Under `/api/v1`, route scaffolds are
+Liveness is `GET /health` at the root. Under `/api/v1`, endpoints are
 `GET /models/active`, `POST /predictions` and `POST /predictions/batch`.
 Health reports process availability, not model/database readiness.
 
@@ -122,7 +122,7 @@ fields are rejected. Unsupported bureau fields are not accepted or fabricated.
 Income must be positive. Monetary inputs must use the source dataset's units;
 its currency is not verified, so examples are not localized currency conversions.
 
-The intended response includes probability, score, level, model name/version and
+The response includes probability, score, level, model name/version and
 SHAP contributions. `risk_score = round(default_probability * 100)`;
 0–30 LOW, 31–70 MEDIUM, 71–100 HIGH, based on the rounded score.
 These illustrative categories are separate from a classification threshold.
@@ -139,12 +139,19 @@ uv run --locked uvicorn credit_risk.main:app --reload
 docker compose up --build
 ```
 
-Compose defines PostgreSQL, a migration command and the API. No Alembic revisions
-exist yet, so `alembic upgrade head` currently creates no application tables.
-The selected model is a local artifact, not bundled in Git. SHAP is implemented,
-but migrations and transaction integration remain pending: a running container
-does not yet mean predictions work. The configured artifact is selected through
-`MODEL_PATH`; `.env.example` lists the remaining configuration.
+For a local Python process, set `DATABASE_URL` to your local PostgreSQL instance
+and apply the schema before starting the API:
+
+```bash
+uv run --locked alembic upgrade head
+```
+
+Compose applies the same migration before starting the API. The selected model
+is a local artifact, not bundled in Git. `MODEL_PATH` must point to its joblib file
+with the matching JSON sidecar. Only trusted local artifacts should be loaded.
+The backend verifies the frozen hashes when `frozen.json` is present.
+See [backend verification and transaction semantics](docs/backend.md).
+A clean-container prediction demo and readiness/correlation remain Phase 7 work.
 
 ## Quality
 
@@ -164,8 +171,14 @@ uv run --locked pytest --basetemp=$testTemp
 ```
 
 GitHub Actions runs quality checks and a Docker build for pushes to `main` and
-pull requests targeting `main`. Database integration coverage is still pending.
+pull requests targeting `main`, including PostgreSQL integration tests.
 This is CI; automated deployment is outside the current scope.
+
+To run integration tests locally, create a dedicated PostgreSQL database whose
+name ends in `_test` and set `TEST_DATABASE_URL` explicitly. See
+[the backend guide](docs/backend.md) for the isolated Docker setup. Tests create
+and remove their own random schemas. Without this variable, integration tests
+are skipped; unit tests still run. CI always sets it.
 
 ## Ethical considerations
 

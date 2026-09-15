@@ -10,6 +10,7 @@ This module has no FastAPI or database dependency, per CODESTYLE.md §3.
 """
 
 import json
+import pickle
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -111,7 +112,17 @@ def load_model_artifact(artifact_path: Path) -> ModelArtifact:
         raw_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         raw_metadata["trained_at"] = datetime.fromisoformat(raw_metadata["trained_at"])
         metadata = ModelArtifactMetadata(**raw_metadata)
-    except (OSError, ValueError, TypeError, KeyError) as err:
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        EOFError,
+        pickle.UnpicklingError,
+        ImportError,
+        AttributeError,
+        IndexError,
+    ) as err:
         raise ModelLoadError(f"Failed to load model artifact at '{artifact_path}'") from err
 
     return ModelArtifact(pipeline=pipeline, metadata=metadata)

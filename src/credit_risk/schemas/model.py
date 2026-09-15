@@ -9,4 +9,7 @@ class ActiveModelResponse(BaseModel):
     name: str
     version: str
     algorithm: str
-    roc_auc: float
+    roc_auc: float | None
+    threshold: float
+    calibration: str
+    metrics_partition: str

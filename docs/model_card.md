@@ -1,7 +1,7 @@
 # Model Card — CreditRisk
 
 **Status: Phase 4 complete, 2026-09-09. XGBoost selected, frozen and evaluated
-once on test. Phase 5 SHAP is complete; operational serving remains pending.**
+once on test. Phase 5 SHAP and Phase 6 transactional serving are implemented.**
 
 ## Purpose and intended use
 

@@ -53,8 +53,8 @@ Each contribution has `feature`, signed `impact` and `direction`
 scaffold. The ORM JSONB field stores the same complete object. The service passes
 the same loaded pipeline to prediction and explanation.
 
-SHAP and its service mapping are implemented; operational PostgreSQL migrations,
-transaction tests and full serving remain Phase 6 work.
+SHAP is integrated with transactional PostgreSQL serving. See
+[backend verification](backend.md) for the Phase 6 execution evidence.
 
 ## Reproduction
 

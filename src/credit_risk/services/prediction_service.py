@@ -1,9 +1,4 @@
-"""Orchestrates the end-to-end single-prediction flow.
-
-Route handlers depend only on this service, never on `credit_risk.ml`,
-`credit_risk.db`, or a repository directly, per the layering rules in
-CODESTYLE.md §3.
-"""
+"""Compute predictions and commit each single request or complete batch atomically."""
 
 import time
 import uuid
@@ -13,19 +8,19 @@ from typing import Literal
 
 import pandas as pd
 import structlog
+from sqlalchemy.orm import Session
 
-from credit_risk.config.settings import Settings, get_settings
-from credit_risk.db.models.model import ModelMetadata
+from credit_risk.config.settings import Settings
 from credit_risk.db.models.prediction import Prediction
+from credit_risk.exceptions import BatchSizeExceededError
 from credit_risk.ml import predict as ml_predict
-from credit_risk.ml import registry as ml_registry
-from credit_risk.ml.registry import ModelArtifactMetadata
 from credit_risk.repositories.interfaces import (
     ModelRepositoryProtocol,
     PredictionRepositoryProtocol,
 )
 from credit_risk.schemas.prediction import PredictionRequest
 from credit_risk.services.explanation_service import Explanation, ExplanationService
+from credit_risk.services.model_service import ModelService, load_serving_artifact
 from credit_risk.services.risk_service import calculate_risk_score
 
 logger = structlog.get_logger(__name__)
@@ -33,7 +28,7 @@ logger = structlog.get_logger(__name__)
 
 @dataclass(frozen=True)
 class PredictionResult:
-    """Domain-level result of a single prediction, independent of the API schema."""
+    """Domain result independent of the HTTP schema."""
 
     default_probability: float
     risk_score: int
@@ -44,124 +39,78 @@ class PredictionResult:
 
 
 class PredictionService:
-    """Predicts default probability for a single loan application."""
+    """Use one artifact per request and one transaction for all persistence."""
 
     def __init__(
         self,
         prediction_repository: PredictionRepositoryProtocol,
         model_repository: ModelRepositoryProtocol,
+        session: Session,
+        settings: Settings,
         explanation_service: ExplanationService | None = None,
-        settings: Settings | None = None,
     ) -> None:
-        """Wire the service with its collaborators.
-
-        Args:
-            prediction_repository: Storage for the resulting prediction.
-            model_repository: The model registry (`models` table), used to
-                resolve the `model_id` FK that SPECS.md §6 requires every
-                prediction to carry.
-            explanation_service: Computes per-prediction SHAP contributions.
-                Defaults to a new `ExplanationService` instance.
-            settings: Application settings. Defaults to the process-wide
-                cached settings.
-        """
+        """Wire collaborators sharing the same request-scoped database session."""
         self._prediction_repository = prediction_repository
-        self._model_repository = model_repository
+        self._session = session
+        self._settings = settings
+        self._models = ModelService(session, model_repository, Path(settings.model_path))
         self._explanation_service = explanation_service or ExplanationService()
-        self._settings = settings or get_settings()
 
     def predict(self, request: PredictionRequest) -> PredictionResult:
-        """Run the full inference pipeline for one loan application.
+        """Return a result only after its database transaction commits."""
+        return self.predict_batch([request])[0]
 
-        Args:
-            request: A validated loan application.
-
-        Returns:
-            The domain-level prediction result, already persisted.
-
-        Raises:
-            ModelNotFoundError: If no trained model artifact exists at the
-                configured `MODEL_PATH`.
-            ModelLoadError: If the artifact exists but fails to deserialize.
-        """
-        request_id = str(uuid.uuid4())
-        started_at = time.perf_counter()
-
-        artifact = ml_registry.load_model_artifact(Path(self._settings.model_path))
-        model_row = self._resolve_model_metadata(artifact.metadata)
-        features = _to_feature_frame(request)
-
-        default_probability = ml_predict.predict(artifact.pipeline, features)
-        risk = calculate_risk_score(default_probability)
-        explanation = self._explanation_service.explain(artifact.pipeline, features)
-
-        latency_ms = (time.perf_counter() - started_at) * 1000
-
-        self._prediction_repository.add(
-            Prediction(
-                customer_id=None,
-                model_id=model_row.id,
-                request_id=request_id,
-                default_probability=default_probability,
-                risk_score=risk.value,
-                risk_level=risk.level,
-                prediction_version=model_row.version,
-                latency_ms=latency_ms,
-                explanation=asdict(explanation),
+    def predict_batch(self, requests: list[PredictionRequest]) -> list[PredictionResult]:
+        """Preserve order; roll back the entire batch on any persistence failure."""
+        if not 1 <= len(requests) <= self._settings.max_batch_size:
+            raise BatchSizeExceededError(
+                f"Batch size must be between 1 and {self._settings.max_batch_size}."
             )
-        )
-
+        loaded = load_serving_artifact(Path(self._settings.model_path))
+        results = []
+        latencies = []
+        for request in requests:
+            started = time.perf_counter()
+            frame = _to_feature_frame(request)
+            probability = ml_predict.predict(loaded.artifact.pipeline, frame)
+            risk = calculate_risk_score(probability)
+            explanation = self._explanation_service.explain(loaded.artifact.pipeline, frame)
+            results.append(
+                PredictionResult(
+                    probability,
+                    risk.value,
+                    risk.level,
+                    loaded.artifact.metadata.name,
+                    loaded.artifact.metadata.version,
+                    explanation,
+                )
+            )
+            latencies.append((time.perf_counter() - started) * 1000)
+        # Compute before acquiring the registry lock; commit before responding.
+        with self._session.begin():
+            model = self._models.resolve(loaded)
+            for result, latency in zip(results, latencies, strict=True):
+                self._prediction_repository.add(
+                    Prediction(
+                        customer_id=None,
+                        model_id=model.id,
+                        request_id=str(uuid.uuid4()),
+                        default_probability=result.default_probability,
+                        risk_score=result.risk_score,
+                        risk_level=result.risk_level,
+                        prediction_version=result.model_version,
+                        latency_ms=latency,
+                        explanation=asdict(result.explanation),
+                    )
+                )
         logger.info(
-            "prediction_served",
-            request_id=request_id,
-            model_version=model_row.version,
-            latency_ms=latency_ms,
-            risk_level=risk.level,
+            "predictions_committed",
+            model_name=loaded.artifact.metadata.name,
+            model_version=loaded.artifact.metadata.version,
+            count=len(results),
+            inference_latency_ms=sum(latencies),
         )
-
-        return PredictionResult(
-            default_probability=default_probability,
-            risk_score=risk.value,
-            risk_level=risk.level,
-            model_name=model_row.name,
-            model_version=model_row.version,
-            explanation=explanation,
-        )
-
-    def _resolve_model_metadata(self, artifact_metadata: ModelArtifactMetadata) -> ModelMetadata:
-        """Return the `models` table row matching a loaded artifact, registering it if needed.
-
-        The `ml.registry` sidecar JSON is the source of truth for "what the
-        currently configured artifact is"; this method makes sure a
-        matching row exists in the `models` table so `Prediction.model_id`
-        (SPECS.md §6) always has something to point at, without requiring a
-        separate manual "register this model" step before the first
-        prediction can be served. Auto-registered rows are marked active;
-        promoting a different model later is a `ModelRepositoryProtocol`
-        concern, not this method's.
-        """
-        existing = self._model_repository.get_by_name_version(
-            artifact_metadata.name, artifact_metadata.version
-        )
-        if existing is not None:
-            return existing
-
-        return self._model_repository.add(
-            ModelMetadata(
-                name=artifact_metadata.name,
-                version=artifact_metadata.version,
-                algorithm=artifact_metadata.algorithm,
-                training_dataset=artifact_metadata.dataset_version,
-                feature_version=artifact_metadata.feature_version,
-                roc_auc=artifact_metadata.metrics.get("roc_auc"),
-                pr_auc=artifact_metadata.metrics.get("pr_auc"),
-                f1=artifact_metadata.metrics.get("f1"),
-                brier_score=artifact_metadata.metrics.get("brier_score"),
-                artifact_path=str(self._settings.model_path),
-                trained_at=artifact_metadata.trained_at,
-                is_active=True,
-            )
-        )
+        return results
 
 
 def _to_feature_frame(request: PredictionRequest) -> pd.DataFrame:

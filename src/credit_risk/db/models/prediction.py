@@ -10,7 +10,7 @@ this schema.
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, Float, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Enum, Float, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,18 +23,17 @@ if TYPE_CHECKING:
 
 
 class Prediction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A persisted model prediction, traceable to the exact model used.
-
-    Note:
-        `request_id`, `latency_ms`, and `explanation` are not in SPECS.md
-        §6's canonical Prediction table, but are required to log what
-        SPECS.md §33 (Logging) mandates — request ID, latency, and (per
-        §19/§25) reproducible historical explanations — so they are kept
-        here as legitimate additions rather than removed for a literal
-        column-for-column match.
-    """
+    """Anonymous prediction linked to its model, with its complete stored explanation."""
 
     __tablename__ = "predictions"
+    __table_args__ = (
+        CheckConstraint(
+            "default_probability >= 0 AND default_probability <= 1",
+            name="ck_predictions_probability",
+        ),
+        CheckConstraint("risk_score >= 0 AND risk_score <= 100", name="ck_predictions_score"),
+        CheckConstraint("latency_ms >= 0", name="ck_predictions_latency"),
+    )
 
     customer_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
