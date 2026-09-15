@@ -56,6 +56,17 @@ Synchronous route functions run blocking database/model work through FastAPI's
 threadpool. Async SQLAlchemy is not required for this MVP. See
 [FastAPI concurrency documentation](https://fastapi.tiangolo.com/async/).
 
+Every HTTP request receives a bounded `X-Request-ID`, either propagated from the
+caller or generated as a UUID. Structlog context variables attach it to request,
+model-load and prediction-commit events without logging applicant payloads. One
+completion or failure event records method, path, status and request duration.
+
+`GET /health` is process liveness. `GET /ready` queries the serving tables and mapped
+columns without fetching rows, through the repository layer, and fully
+loads and validates the configured artifact, including frozen hashes when present.
+It performs no model registration or prediction write. The Docker health check uses
+readiness so an API with a missing model or unavailable database is not marked healthy.
+
 ## Persistence and artifacts
 
 `MODEL_PATH` selects the artifact. Each single/batch request loads it once; prediction
@@ -91,7 +102,7 @@ a persistent exclusive marker prevents accidental repetition within the run.
 `--initial-only` preserves the initial comparison through `ml.experiments`.
 See [protocol](selection_protocol.md) and [evaluation](evaluation_report.md).
 
-## Remaining work
+## Packaging verification
 
 `ml.explain` now computes grouped Tree SHAP in log-odds and checks additivity
 against both the raw margin and pipeline probability. The service passes the same
@@ -100,5 +111,5 @@ Alembic revision `0001` creates the persistence schema, including the retained
 customer/loan/history tables required by existing ORM relationships. Their CRUD
 routes remain disabled. PostgreSQL integration tests verify commits, rollback,
 concurrent registration, identity conflicts and migration upgrade/downgrade.
-See [backend verification](backend.md). Clean-container prediction and complete
-readiness/correlation remain Phase 7 work in [ROADMAP.md](../ROADMAP.md).
+See [backend verification](backend.md). Phase 7 verified this path in a freshly built
+Compose project with a new PostgreSQL volume, real migration and the selected artifact.

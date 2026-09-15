@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from credit_risk.api.exception_handlers import register_exception_handlers
+from credit_risk.api.request_context import REQUEST_ID_HEADER, register_request_context_middleware
 from credit_risk.api.routes import health, models, predictions
 from credit_risk.config.settings import get_settings
 from credit_risk.logging_config import configure_logging
@@ -43,9 +44,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[REQUEST_ID_HEADER],
 )
 
 register_exception_handlers(app)
+register_request_context_middleware(app)
 
 app.include_router(health.router)
 app.include_router(models.router, prefix=settings.api_v1_prefix)

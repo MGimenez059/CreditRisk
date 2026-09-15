@@ -151,7 +151,8 @@ a contract for their output is implemented. Explanations are not causal effects.
 
 ## 20. Prediction API
 
-Root liveness: GET /health. Under `/api/v1`: GET /models/active, POST /predictions
+Root liveness: GET /health. GET /ready checks PostgreSQL and the configured serving
+artifact without writing registry state. Under `/api/v1`: GET /models/active, POST /predictions
 and POST /predictions/batch. See README for a request using only supported fields.
 Batch input is a JSON array; output wraps predictions in `results`.
 Results identify the actual artifact's name/version. Customer CRUD is outside MVP.
@@ -247,13 +248,15 @@ artifact. Do not duplicate model identity from config when artifact metadata exi
 ## 33. Logging
 
 Use structured logs for startup, model loading, errors and inference latency/model
-version, with request correlation. Never log full applicant payloads or credentials.
-CLI progress/errors may use stdout/stderr. Complete request-wide tracing in Phase 7.
+version, with request correlation. `X-Request-ID` is propagated when it is bounded
+and safe; otherwise generate a UUID. Return the identifier in every HTTP response.
+Never log full applicant payloads or credentials. CLI progress/errors may use stdout/stderr.
 
 ## 34. Observability
 
 MVP observability is structured logs, correlation, latency and meaningful readiness
-checks. Current /health is liveness only. Advanced telemetry is optional post-MVP.
+checks. `/health` is liveness; `/ready` verifies the database and serving artifact.
+Advanced telemetry is optional post-MVP.
 
 ## 35. Model Monitoring — Future
 

@@ -38,3 +38,7 @@ class ExplanationError(CreditRiskError):
 
 class BatchSizeExceededError(CreditRiskError):
     """Raised when a batch prediction request exceeds the configured maximum size."""
+
+
+class ReadinessError(CreditRiskError):
+    """Raised when a dependency required for prediction serving is unavailable."""

@@ -33,6 +33,23 @@ Missing files return 404. Unsupported/corrupt artifacts and SHAP failures return
 return 503 with a generic message; SQL, credentials and applicant fields are not
 included in that response or error log.
 
+`GET /health` reports liveness only. `GET /ready` checks the mapped columns of both
+serving tables with zero-row queries against PostgreSQL
+and loads the configured model through the same compatibility and hash validation used
+for predictions. It does not register a model or write a prediction. A failed check
+returns a generic 503. Docker uses this endpoint for its container health check.
+
+Every request returns `X-Request-ID`. Safe caller identifiers up to 128 characters are
+propagated; missing or unsafe values are replaced with a UUID. The identifier is bound
+to all structured application events in that request, including model loading and the
+post-commit prediction event. Request logs contain method, path, status and duration,
+but never the request body or applicant fields. Handled and unexpected failures are
+logged and unexpected responses use a generic 500 body.
+Unexpected exception messages and tracebacks are excluded from logs because they may
+contain sensitive values. The request event retains the exception type and request ID.
+Readiness checks schema readability and artifact compatibility, not write permissions
+or a complete inference/SHAP round trip; the container demo verifies that full path.
+
 ## Schema and setup
 
 Revision `0001` creates `models` and `predictions`, with foreign keys, indexes and
@@ -89,7 +106,7 @@ configured push/PR. Tests verify migration parity, downgrade/re-upgrade, persist
 responses, batch order, concurrent first registration, artifact/metadata conflicts,
 SHAP failures, database constraint failures and commit rollback.
 
-## Execution evidence (2026-09-14)
+## Phase 6 execution evidence (2026-09-14)
 
 A local FastAPI TestClient run against PostgreSQL 16 used the frozen `selected-v1`
 artifact and freshly migrated isolated schema. Single and two-item batch endpoints
@@ -102,9 +119,10 @@ probability 0.10521303117275238. The matching batch item returned the identical 
 Hashes of every selected-run file were unchanged afterward; no final-test scoring
 or model training took place in this smoke run. Its temporary schema was removed.
 
-This verifies HTTP routing and real PostgreSQL persistence in the local Python
-runtime. A full clean-container prediction demo, request-wide correlation and
-readiness remain Phase 7 work. `/health` still reports liveness only.
+This verified HTTP routing and real PostgreSQL persistence in the local Python
+runtime. At the time of that check, a clean-container demo, correlation and readiness
+were still pending; the Phase 7 evidence below verifies them. `/health` remains
+liveness only.
 
 Quality verification: the full 140-test suite passed with 82% total coverage,
 followed by the added inference-failure regression (1 passed). The final suite
@@ -121,3 +139,38 @@ only in the local test container for inspection, not in Git.
 The runtime Docker image also built successfully as `credit-risk:phase6`.
 The local test database container was stopped after verification and can be
 restarted with the command above.
+
+## Phase 7 clean-container evidence (2026-09-15)
+
+Compose project `credit-risk-phase7-demo` was built from the current Dockerfile and
+started with a newly created network and PostgreSQL volume. The migration service
+completed revision `0001` before the API started. The selected-v1 directory was mounted
+read-only; the artifact is not embedded in the image.
+
+`GET /health`, `GET /ready`, `POST /api/v1/predictions` and
+`GET /api/v1/models/active` all returned HTTP 200 from the containers. Readiness named
+`credit-risk-xgboost` version `selected-v1`. The README synthetic request returned
+probability `0.10521303117275238`, score 11 and LOW, with the complete SHAP explanation.
+PostgreSQL contained one model, one prediction and Alembic revision `0001` afterward.
+Hashes of all selected-v1 files were unchanged.
+The rebuilt final API image remained healthy via `/ready`. A subsequent two-item
+batch returned 200, loaded the model once and brought the prediction count to three
+without creating another model row.
+
+The caller identifier `phase7-clean-demo` appeared on the response and on the matching
+request-start, model-load, prediction-commit and request-completion JSON events. A
+separate invalid request returned 422 and emitted `request_failed` with its correlation
+identifier; its body and applicant field names were absent from application logs.
+
+Final locked-environment verification passed Ruff format and lint, strict MyPy and
+149 Pytest tests, including PostgreSQL integration tests, with 83% total coverage.
+The four visible third-party deprecation warnings remain unchanged and unsuppressed.
+
+Follow-up review on 2026-09-15 replaced the connectivity-only probe with zero-row
+queries for serving tables/columns and sanitized unexpected exceptions at the HTTP
+middleware boundary. A missing-column integration test verifies readiness 503 while
+liveness remains 200. An unexpected-error regression verifies one correlated failure
+event without the sensitive exception message and without propagating to the server.
+All 150 tests passed with a fresh ignored temporary directory, along with Ruff and
+MyPy. The previously running demo image predates these review changes; rebuild with
+`docker compose -p credit-risk-phase7-demo up --build -d` to run them in that demo.

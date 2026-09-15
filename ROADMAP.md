@@ -1,9 +1,11 @@
 # CreditRisk — Work Roadmap
 
 This is the single source of phase status. A scaffold is not an operational feature.
-Phase 4 is complete. Grouped CV, bounded tuning, calibration comparison and
+Phases 4–7 are complete. Grouped CV, bounded tuning, calibration comparison and
 threshold selection produced a frozen model, evaluated once on the original test.
-See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete; see [explainability](docs/explainability.md). Phase 6 is complete; see [backend verification](docs/backend.md). Phase 7 is next.
+SHAP, transactional serving and the clean-container operational demo are verified.
+See [the evaluation report](docs/evaluation_report.md), [explainability](docs/explainability.md)
+and [backend verification](docs/backend.md).
 
 ## Phase 0 — Planning
 - [x] Define portfolio scope, target convention and non-goals.
@@ -62,8 +64,8 @@ See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete
 ## Phase 7 — Packaging
 - [x] Dockerfile, Compose and migration startup command exist.
 - [x] Structured logging and centralized error-handler scaffolds exist.
-- [ ] Verify a clean-container prediction demo using a trained artifact and real migrations.
-- [ ] Complete request correlation, failure logging and readiness checks.
+- [x] Verify a clean-container prediction demo using a trained artifact and real migrations.
+- [x] Complete request correlation, failure logging and readiness checks.
 
 ## Phase 8 — Testing & Quality
 - [x] Unit tests for data, feature engineering, preprocessing, baselines and risk scoring.
@@ -77,7 +79,7 @@ See [the evaluation report](docs/evaluation_report.md). Phase 5 SHAP is complete
 ## Phase 10 — Documentation & Portfolio
 - [x] Separate implemented behavior from planned features; remove duplicate phase lists.
 - [x] Publish real-data baseline validation and updated model card.
-- [ ] Publish the selected-model evaluation and operational serving demo.
+- [x] Publish the selected-model evaluation and operational serving demo.
 - [ ] Review sensitive/proxy features and document uncertainty without compliance claims.
 
 ## Post-MVP (optional)

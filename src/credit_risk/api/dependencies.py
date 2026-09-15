@@ -17,6 +17,7 @@ from credit_risk.repositories.model import SQLAlchemyModelRepository
 from credit_risk.repositories.prediction import SQLAlchemyPredictionRepository
 from credit_risk.services.model_service import ModelService
 from credit_risk.services.prediction_service import PredictionService
+from credit_risk.services.readiness_service import ReadinessService
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -55,3 +56,11 @@ def get_model_service(
 ) -> ModelService:
     """Provide the configured model service with a request-scoped transaction."""
     return ModelService(session, repository, Path(settings.model_path))
+
+
+def get_readiness_service(
+    session: DbSession,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ReadinessService:
+    """Provide dependency checks using the request-scoped database session."""
+    return ReadinessService(session, Path(settings.model_path))

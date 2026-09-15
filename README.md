@@ -3,10 +3,11 @@
 A portfolio project for estimating loan default probability and demonstrating
 Data Science, ML Engineering, and Backend development with public tabular data.
 
-**Current status: Phase 6 complete.** Grouped cross-validation, bounded Optuna
+**Current status: Phase 7 complete.** Grouped cross-validation, bounded Optuna
 tuning, calibration comparison and threshold selection are implemented. A selected
 XGBoost pipeline was frozen and evaluated once on test. Global and local SHAP
-explanations and transactional PostgreSQL prediction serving are implemented. See [ROADMAP.md](ROADMAP.md).
+explanations, transactional PostgreSQL prediction serving, readiness and correlated
+request logging are implemented. See [ROADMAP.md](ROADMAP.md).
 
 ## Scope
 
@@ -96,9 +97,12 @@ and [machine-readable selection evidence](docs/selection_results.json).
 
 ## API contract
 
-Liveness is `GET /health` at the root. Under `/api/v1`, endpoints are
+Liveness is `GET /health` at the root. `GET /ready` verifies PostgreSQL serving columns
+and the configured immutable serving artifact without changing registry state.
+Under `/api/v1`, endpoints are
 `GET /models/active`, `POST /predictions` and `POST /predictions/batch`.
-Health reports process availability, not model/database readiness.
+Successful and failed responses carry `X-Request-ID`. A bounded caller-provided value
+is propagated; otherwise the application generates a UUID for request-wide logs.
 
 Example synthetic request:
 
@@ -151,7 +155,8 @@ is a local artifact, not bundled in Git. `MODEL_PATH` must point to its joblib f
 with the matching JSON sidecar. Only trusted local artifacts should be loaded.
 The backend verifies the frozen hashes when `frozen.json` is present.
 See [backend verification and transaction semantics](docs/backend.md).
-A clean-container prediction demo and readiness/correlation remain Phase 7 work.
+The container health check calls `/ready`, while `/health` remains process liveness.
+A clean Compose demo with the selected artifact is recorded in the backend guide.
 
 ## Quality
 

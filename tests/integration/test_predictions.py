@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import event, func, inspect, select
+from sqlalchemy import event, func, inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,31 @@ def test_single_request_commits_exact_explanation(api, database, request_payload
     total = explanation["base_value"] + sum(x["impact"] for x in explanation["contributions"])
     assert 1 / (1 + np.exp(-total)) == pytest.approx(body["default_probability"], abs=1e-6)
     assert client.get("/api/v1/models/active").json()["version"] == body["model"]["version"]
+
+
+def test_readiness_checks_real_database_and_artifact_without_writing(api, database):
+    client, _ = api
+
+    response = client.get("/ready")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "status": "ready",
+        "checks": {"database": "ready", "model": "ready"},
+        "model": {"name": "synthetic-xgboost", "version": "test-v1"},
+    }
+    assert counts(database) == (0, 0)
+
+
+def test_readiness_rejects_missing_serving_column(api, database):
+    client, _ = api
+    # The fixture owns this isolated schema; leave all shared databases untouched.
+    with database.begin() as connection:
+        connection.execute(text("ALTER TABLE predictions DROP COLUMN explanation"))
+    response = client.get("/ready")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Service dependencies are unavailable."}
+    assert client.get("/health").status_code == 200
 
 
 def test_batch_commits_in_order_with_one_model_load(api, database, request_payload, monkeypatch):
