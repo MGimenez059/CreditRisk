@@ -68,8 +68,7 @@ The two independent runs produced identical split assignments and validation met
 | Recall at 0.5 | 0.798689 | 0.750000 |
 
 Random Forest improves ranking and probability error on this validation split;
-Logistic Regression has higher recall at threshold 0.5. Do not claim Random Forest
-wins on every metric. The older row-split figures in Git history are not directly
+Logistic Regression has higher recall at threshold 0.5. The older row-split figures in Git history are not directly
 comparable: the partition and environment changed.
 
 ## Reproducibility

@@ -1,6 +1,6 @@
 # CreditRisk — Work Roadmap
 
-This is the single source of phase status. A scaffold is not an operational feature.
+This is the single source of phase status. Completed features require execution evidence.
 The educational MVP is complete through Phase 10. Grouped CV, bounded tuning, calibration comparison and
 threshold selection produced a frozen model, evaluated once on the original test.
 SHAP, transactional serving and the clean-container operational demo are verified.
@@ -106,4 +106,5 @@ Include tests, Docker, CI and clear documentation. No frontend or production dep
 
 Implementation works for the intended inputs; relevant tests and quality checks pass;
 results are reproducible; documentation reflects actual status. No secrets or direct
-personal data are committed. A checkbox does not substitute for execution evidence.
+personal data are committed. Each completed item must have supporting execution or
+review evidence.

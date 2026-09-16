@@ -6,8 +6,9 @@ the `viz` extra for Matplotlib and a notebook kernel.
 
 Its outputs precede the grouped Phase 3 protocol. They provide historical descriptive
 evidence, not current model validation. Re-execution requires the local dataset.
-Model comparison and SHAP notebooks may be added when those phases produce results;
-there is no requirement to create empty notebooks in advance.
+Model comparison and SHAP results are published in the
+[evaluation report](../docs/evaluation_report.md) and
+[explanation report](../docs/explainability.md); their workflows run through scripts.
 
 Reusable transformations and training belong in `src/credit_risk/ml/`. Application
 code never imports notebooks. See [ROADMAP.md](../ROADMAP.md).

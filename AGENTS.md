@@ -8,7 +8,7 @@ Before changing this repository, read the current versions of:
 2. [CODESTYLE.md](CODESTYLE.md): engineering and commit conventions.
 3. [SPECS.md](SPECS.md): technical requirements and MVP scope.
 4. [ROADMAP.md](ROADMAP.md): current phase, completed work and next steps.
-5. [Architecture](docs/architecture.md): boundaries and pending serving work.
+5. [Architecture](docs/architecture.md): component boundaries and serving behavior.
 6. [Data dictionary](docs/data_dictionary.md) and
    [model card](docs/model_card.md): inputs, evaluation protocol and limitations.
 
@@ -17,8 +17,8 @@ For data/model changes also read the current [quality report](docs/data_quality_
 [baseline results](docs/baseline_results.json). Consult [notebook guidance](notebooks/README.md)
 when working on EDA. Inspect Git status and relevant implementation before editing.
 
-These files are the project memory. Read their current contents rather than relying
-on a previous conversation or duplicating their full text here. ROADMAP owns phase
+These files are the authoritative project documentation. Read their current contents
+rather than relying on prior context or duplicating their full text here. ROADMAP owns phase
 status; CODESTYLE owns engineering conventions; SPECS owns required behavior.
 Resolve contradictions explicitly and keep affected documents consistent with changes.
 

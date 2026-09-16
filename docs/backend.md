@@ -124,21 +124,19 @@ runtime. At the time of that check, a clean-container demo, correlation and read
 were still pending; the Phase 7 evidence below verifies them. `/health` remains
 liveness only.
 
-Quality verification: the full 140-test suite passed with 82% total coverage,
-followed by the added inference-failure regression (1 passed). The final suite
-contains 118 unit tests and 23 PostgreSQL integration tests. Ruff formatting/lint
+Quality verification at the Phase 6 checkpoint covered 141 tests: 118 unit tests
+and 23 PostgreSQL integration tests. The 140-test coverage run reported 82%, followed
+by a passing inference-failure regression. Ruff formatting/lint
 and strict MyPy passed. Four existing dependency deprecations remain visible
 (Starlette and optional SHAP/Matplotlib); no warnings are suppressed.
 
 A second smoke run used the normal application dependencies (no HTTP dependency
 overrides) after CLI `alembic upgrade head` and `alembic check` against the dedicated
 test database. Single/batch/active endpoints returned 200, three synthetic predictions
-were committed, and selected-run hashes remained unchanged. These three rows remain
-only in the local test container for inspection, not in Git.
+were committed, and selected-run hashes remained unchanged. Verification used
+synthetic requests in the dedicated test database.
 
 The runtime Docker image also built successfully as `credit-risk:phase6`.
-The local test database container was stopped after verification and can be
-restarted with the command above.
 
 ## Phase 7 clean-container evidence (2026-09-15)
 
@@ -149,7 +147,7 @@ read-only; the artifact is not embedded in the image.
 
 `GET /health`, `GET /ready`, `POST /api/v1/predictions` and
 `GET /api/v1/models/active` all returned HTTP 200 from the containers. Readiness named
-`credit-risk-xgboost` version `selected-v1`. The README synthetic request returned
+`credit-risk-xgboost` version `selected-v1`. The SHAP report's synthetic request returned
 probability `0.10521303117275238`, score 11 and LOW, with the complete SHAP explanation.
 PostgreSQL contained one model, one prediction and Alembic revision `0001` afterward.
 Hashes of all selected-v1 files were unchanged.
@@ -172,5 +170,6 @@ middleware boundary. A missing-column integration test verifies readiness 503 wh
 liveness remains 200. An unexpected-error regression verifies one correlated failure
 event without the sensitive exception message and without propagating to the server.
 All 150 tests passed with a fresh ignored temporary directory, along with Ruff and
-MyPy. The previously running demo image predates these review changes; rebuild with
-`docker compose -p credit-risk-phase7-demo up --build -d` to run them in that demo.
+MyPy. These review changes were verified by the test suite; the container execution
+above predates them. To build and run the current checkout, use
+`docker compose up --build -d` after completing the setup instructions.

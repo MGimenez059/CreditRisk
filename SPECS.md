@@ -233,7 +233,7 @@ Published reports identify their snapshot/status and are not manually fabricated
 Use the committed uv.lock and Python 3.12 reference environment. Record runtime
 versions and the input content hash per run. `scripts/train_baselines.py` must work
 after environment setup and ingestion with no notebook execution. Record split
-positions and report actual sizes. Reproducibility requires more than a seed.
+positions and report actual sizes. Record the environment and input snapshot alongside the seed.
 
 ## 31. Docker
 
@@ -269,8 +269,8 @@ and actual outcome availability. They are not Phase 3 or MVP requirements.
 
 Use public non-identifying data and synthetic examples. Do not commit credentials
 or direct personal identifiers. Public data does not establish synthetic origin.
-Authentication, rate limits and deployment hardening are future deployment work,
-not an excuse to claim the demo is production-ready.
+Authentication, rate limits and deployment hardening remain prerequisites for a
+future production deployment.
 
 ## 37. Ethical / Responsible ML
 
@@ -319,8 +319,8 @@ entirely unavailable fields.
 ## 45. Success Criteria
 
 Demonstrate sound data handling, leakage-aware evaluation, reproducible artifacts,
-model comparison, explanations and maintainable serving. Additional infrastructure
-does not compensate for missing evaluation or a non-working prediction path.
+model comparison, explanations and maintainable serving. Verify the evaluation and
+prediction path before extending infrastructure.
 
 ## 46. Long-Term Architecture
 

@@ -38,8 +38,8 @@ Trial details and fold metrics are retained in the JSON evidence.
 Selected candidate: **xgboost-trial-6**. It had the highest mean ROC-AUC;
 the other model families fell outside the predeclared 0.002 AUC tolerance.
 Its lower CV log loss and Brier score also support this choice despite its
-greater complexity than Logistic Regression. Random Forest was not forced out
-by an XGBoost-only selection rule.
+greater complexity than Logistic Regression. All three model families were eligible
+under the same selection criteria.
 
 XGBoost: 200 trees, depth 5, learning rate 0.1407256738281049,
 min_child_weight=1, scale_pos_weight=1, hist, seed 42, one CPU thread.
@@ -110,11 +110,14 @@ Read the saved final test report instead of scoring test again. The CLI marker
 prevents accidental repetition within a run, not deliberate changes or a new
 checkout. Future research must disclose that test results are now known.
 
-## Limitations and remaining product work
+## Limitations and related implementation
 
 No temporal validation, verified population/horizon, entity identifiers,
 fairness audit or real-lending validation. Grouping cannot identify different
 records belonging to one person. Historical EDA used the full dataset.
 The small tuning budget does not exhaust possible models. Probability metrics
 and reliability plots do not prove calibration under deployment shift.
-SHAP (Phase 5) and operational API/database serving (Phase 6) remain pending.
+The subsequent [SHAP report](explainability.md) and [backend guide](backend.md)
+document implemented explanations and transactional serving. The
+[model card](model_card.md#sensitive-and-proxy-feature-review-2026-09-16) contains
+the qualitative feature review; it is not a quantitative fairness audit.

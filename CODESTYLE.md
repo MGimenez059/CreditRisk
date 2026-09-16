@@ -60,7 +60,8 @@ Only claim complete request tracing once all relevant paths implement it.
 Use Pytest with independent fixtures. Isolated filesystem tests may use tmp_path;
 unit tests do not need live databases/network. Database integration tests use a
 dedicated database. Verify meaningful behavior: grouping, raw-input round trips,
-preprocessing isolation, service boundaries and failure paths. Coverage is not a quota.
+preprocessing isolation, service boundaries and failure paths. Use coverage to identify
+untested behavior.
 
 ## 12. API Design Conventions
 
@@ -103,14 +104,16 @@ Use English Conventional Commits for logical changes and concise PR descriptions
 
 Run ruff format --check ., ruff check ., mypy src scripts and pytest in the locked
 environment. CI must fail on actual errors. Do not disable checks to hide defects;
-tool rules should implement agreed conventions, not create unnecessary process.
+tool rules should implement agreed conventions and keep the workflow practical.
 
 ## 19. Complexity & Size Guidelines
 
-Prefer short cohesive functions and guard clauses. Roughly 40 lines/function, 300/module and complexity 10 are review signals, not reasons to invent extra layers.
+Prefer short cohesive functions and guard clauses. Review functions over roughly
+40 lines, modules over 300 lines and complexity above 10. Add abstractions when they
+improve clarity or isolate responsibilities.
 
 ## 20. Pre-Merge Checklist
 
 Before completion: relevant tests pass, formatting/lint/types pass, documentation
 matches actual behavior, no secrets are introduced, and remaining execution limitations
-are explicit. A trained result requires a real run, not a plausible table.
+are explicit. Report training results only from recorded runs.
