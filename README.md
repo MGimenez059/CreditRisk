@@ -3,7 +3,7 @@
 A portfolio project for estimating loan default probability and demonstrating
 Data Science, ML Engineering, and Backend development with public tabular data.
 
-**Current status: Phase 7 complete.** Grouped cross-validation, bounded Optuna
+**Current status: educational MVP complete.** Grouped cross-validation, bounded Optuna
 tuning, calibration comparison and threshold selection are implemented. A selected
 XGBoost pipeline was frozen and evaluated once on test. Global and local SHAP
 explanations, transactional PostgreSQL prediction serving, readiness and correlated
@@ -15,6 +15,31 @@ The MVP is a reproducible training workflow, an evaluated model, SHAP explanatio
 a FastAPI prediction endpoint, PostgreSQL prediction/model persistence, tests,
 Docker and CI. XGBoost was selected from the documented comparison with both baselines.
 Customer/loan CRUD, a frontend and advanced infrastructure are outside the MVP.
+
+## Explore the project
+
+Start with the [model comparison and evaluation](docs/evaluation_report.md), then
+the [explanation report](docs/explainability.md) and [working API demo](docs/backend.md).
+The [model card](docs/model_card.md) explains intended use, feature choices and limitations.
+These reports and images can be viewed directly on GitHub without installing Python.
+
+The global chart summarizes model attributions on 500 development examples:
+
+![Global SHAP importance and signed contributions](docs/shap_global_summary.png)
+
+The local chart explains one synthetic example. Contributions are in log-odds,
+not probability percentage points; they describe model behavior, not causal effects.
+
+![SHAP explanation for one synthetic example](docs/shap_local_explanation.png)
+
+To interact with the API, complete the setup below and start Compose, then open
+[Swagger UI](http://localhost:8000/docs). Expand `POST /api/v1/predictions`, click
+**Try it out**, paste the synthetic JSON below and click **Execute**. A successful
+response shows probability, display score, model identity and SHAP contributions.
+The startup needs a local trained artifact and sidecar; cloning alone does not
+include them. Training instructions below create them from the downloaded dataset.
+Swagger is a technical browser interface; a custom visual demo and public hosting
+are possible follow-up work.
 
 ## Architecture
 

@@ -10,7 +10,7 @@
 | License | Kaggle metadata reports CC0: Public Domain; verified 2026-09-07 |
 | Source version/download date | Version 1, downloaded 2026-09-07; source last updated 2020-06-02 |
 | Snapshot identifier | Baseline CLI records SHA-256 of the validated Parquet actually used |
-| Population and collection process | Not independently verified; do not assert synthetic origin or real-world representativeness |
+| Population and collection process | Publisher describes columns as simulating credit bureau data; generation method and population are not established |
 | Default definition/horizon | Source confirms 0 = non-default, 1 = default; observation horizon unspecified |
 
 The code's MIT license does not establish dataset redistribution rights. Raw data is
@@ -19,10 +19,18 @@ purposes; a hash identifies the input bytes but does not prove upstream provenan
 
 ## Provenance review and scope
 
-Reviewed the [recorded source metadata](dataset_provenance.json) on 2026-09-16.
-It documents the published version, license and binary target mapping, but provides
-no observation horizon, collection dates, sampling method or feature measurement
-timeline. This review uses the saved evidence; it is not a new upstream verification.
+Rechecked the [Kaggle data card](https://www.kaggle.com/datasets/laotse/credit-risk-dataset)
+via indexed page content and its [metadata API](https://www.kaggle.com/api/v1/datasets/view/laotse/credit-risk-dataset)
+on 2026-09-16. The publisher describes the columns as simulating credit bureau data.
+The API confirms that subtitle, version 1 and the binary target mapping. The reviewed
+description does not specify an observation horizon, collection dates, sampling or
+generation method, or feature measurement timeline. The simulation description is a
+publisher statement, not independent verification of how every record was generated.
+
+The discussion page returned no readable thread content to the retrieval tool;
+targeted searches did not establish those missing facts. This review does not claim
+to have inspected every discussion. The [recorded provenance](dataset_provenance.json)
+retains the original download evidence and the dated follow-up findings separately.
 
 These unknowns are retained as dataset limitations rather than unfinished development
 tasks. The educational model estimates the dataset's default label; it cannot be

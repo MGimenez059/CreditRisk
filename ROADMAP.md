@@ -1,7 +1,7 @@
 # CreditRisk — Work Roadmap
 
 This is the single source of phase status. A scaffold is not an operational feature.
-Phases 4–7 are complete. Grouped CV, bounded tuning, calibration comparison and
+The educational MVP is complete through Phase 10. Grouped CV, bounded tuning, calibration comparison and
 threshold selection produced a frozen model, evaluated once on the original test.
 SHAP, transactional serving and the clean-container operational demo are verified.
 See [the evaluation report](docs/evaluation_report.md), [explainability](docs/explainability.md)
@@ -84,9 +84,13 @@ Revisit provenance if new primary-source evidence becomes available.
 - [x] Separate implemented behavior from planned features; remove duplicate phase lists.
 - [x] Publish real-data baseline validation and updated model card.
 - [x] Publish the selected-model evaluation and operational serving demo.
-- [ ] Review sensitive/proxy features and document uncertainty without compliance claims.
+- [x] Review sensitive/proxy features and document uncertainty without compliance claims; see the [qualitative review](docs/model_card.md#sensitive-and-proxy-feature-review-2026-09-16).
 
 ## Post-MVP (optional)
+
+The next presentation candidate is a browser demo with a plain-language input form,
+prediction and visual explanation. Public hosting would let visitors try it without
+local installation. Neither the custom interface nor public hosting is implemented.
 
 Customer/loan CRUD, a dashboard, MLflow, asynchronous batch jobs, remote artifact
 storage and drift/monitoring infrastructure need a concrete use case before implementation.

@@ -1,7 +1,8 @@
 # Model Card — CreditRisk
 
-**Status: Phase 4 complete, 2026-09-09. XGBoost selected, frozen and evaluated
-once on test. Phase 5 SHAP and Phase 6 transactional serving are implemented.**
+**XGBoost selected, frozen and evaluated once on test. SHAP, transactional serving
+and container verification are implemented. Qualitative feature review completed
+2026-09-16; phase status is tracked in [ROADMAP](../ROADMAP.md).**
 
 ## Purpose and intended use
 
@@ -14,8 +15,10 @@ See [ethical considerations](../README.md#ethical-considerations).
 Source: Kaggle `laotse/credit-risk-dataset`; see the [data dictionary](data_dictionary.md).
 The regenerated report retained 32,574 of 32,581 rows after seven exclusions,
 with 165 exact duplicate rows. Kaggle metadata confirms source version 1, CC0 license
-and target 0 = no default, 1 = default. Population, synthetic origin and observation
-horizon remain unverified. See [recorded provenance](dataset_provenance.json).
+and target 0 = no default, 1 = default. The publisher describes columns as simulating
+credit bureau data; the generation method, population and observation horizon
+remain unspecified in the reviewed source material. See
+[the provenance review](data_dictionary.md#provenance-review-and-scope).
 
 ## Features and prediction time
 
@@ -170,6 +173,38 @@ sample, global summary, synthetic example and reconstruction checks.
 - Prior-default data is a binary indicator, not a frequency/count.
 - Grouping prevents identical inputs crossing partitions but cannot identify repeated
   people without entity identifiers, and does not resolve every leakage risk.
-- No fairness audit has been performed. Review age and potential proxy features;
-  differences in category default rates alone cannot establish absence of bias.
+- The qualitative review below identifies potential sensitive/proxy risks. No
+  quantitative fairness audit or subgroup performance evaluation has been performed.
 - No real lending, regulatory compliance or individual creditworthiness claims.
+
+## Sensitive and proxy feature review (2026-09-16)
+
+Scope: the nine raw inputs and three derived features implemented in
+`ml.preprocessing` and `ml.features`, the source dictionary and the saved SHAP report.
+This is a qualitative design review. Possible associations below are hypotheses to
+investigate, not measured discrimination or causal findings in this dataset.
+
+| Input or derived feature | Purpose in the educational model | Risk and decision |
+|---|---|---|
+| `person_age` | Represents age in the source schema. | Direct demographic input; may produce age-related differences. Retained in the frozen educational model, with no claim of suitability for lending. |
+| `person_income`, `person_home_ownership` | Describe income and housing status. | May reflect unequal access to wealth or economic opportunity. Neither is evidence of individual reliability; proxy effects have not been measured. |
+| `person_emp_length` | Represents employment duration. | Career breaks, informal work and age may affect it. Missing values are imputed, which does not establish equal treatment of groups. |
+| `loan_amnt`, `loan_intent` | Describe the requested amount and purpose. | Amount and purposes such as medical or education may reflect different needs and circumstances. Their attributions are not personal advice. |
+| `loan_int_rate` | Represents a known offer rate in the declared scoring scenario. | May encode earlier pricing decisions and their biases. Retained only under the documented priced-offer assumption; source timing is unverified. |
+| `cb_person_cred_hist_length` | Represents length of recorded credit history. | May reflect age and access to formal credit. A short history does not establish poor repayment behavior. |
+| `cb_person_default_on_file` | Represents the binary prior-default indicator. | Definition, reporting practices and history window are uncertain. It is not a count or an independently verified behavioral history. |
+| `loan_to_income` | Expresses loan amount relative to income. | Inherits income-related risks and omits other debts and expenses; it is not a complete affordability assessment. |
+| `income_per_employment_year` | Combines income and employment duration. | Inherits their possible proxy effects; the denominator floor at one year changes behavior for short tenure. It is a model feature, not an economic measure of merit. |
+| `credit_age_ratio` | Combines credit-history length and age. | Explicitly retains age information; removing only the raw age column would not remove this dependence. |
+
+`loan_grade` remains excluded because its derivation and timing are unverified.
+`loan_percent_income` is replaced with the reproducible ratio above. The target is
+never an input. Excluding a field does not prove that correlated inputs are free of
+proxy effects. SHAP explains model output, not fairness, causality or compliance.
+
+Decision: retain the evaluated artifact and document these limits for the educational
+MVP. This review does not justify changing features after seeing final test results;
+there was no retraining or additional test scoring. A future deployment study would
+need a defined population and prediction time, verified labels, appropriate group
+data, and subgroup error/calibration comparisons with sample sizes and uncertainty.
+Any redesigned model would require a new evaluation plan and fresh holdout evidence.
