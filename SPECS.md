@@ -49,9 +49,11 @@ Migrations and tested transaction boundaries are required before serving works.
 
 ## 7. Target Variable
 
-`loan_status`: 0 = no default, 1 = default. This is the local target convention;
-verify the source definition and observation horizon. Never include target values
-or target-derived information in inputs.
+`loan_status`: 0 = no default, 1 = default, as recorded in the source metadata.
+The observation horizon is unspecified and retained as a dataset limitation in the
+[provenance review](docs/data_dictionary.md#provenance-review-and-scope). Do not
+interpret the output as a fixed-horizon forecast. Never include target values or
+target-derived information in inputs.
 
 ## 8. Feature Engineering
 

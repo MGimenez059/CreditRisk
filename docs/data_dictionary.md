@@ -17,6 +17,20 @@ The code's MIT license does not establish dataset redistribution rights. Raw dat
 not committed. [Source version/license evidence](dataset_provenance.json) and a local file hash serve different
 purposes; a hash identifies the input bytes but does not prove upstream provenance.
 
+## Provenance review and scope
+
+Reviewed the [recorded source metadata](dataset_provenance.json) on 2026-09-16.
+It documents the published version, license and binary target mapping, but provides
+no observation horizon, collection dates, sampling method or feature measurement
+timeline. This review uses the saved evidence; it is not a new upstream verification.
+
+These unknowns are retained as dataset limitations rather than unfinished development
+tasks. The educational model estimates the dataset's default label; it cannot be
+described as a 6- or 12-month default forecast or as validated for Argentine borrowers.
+The source update date is not a collection date. Real-world use would require verified
+provenance, a defined prediction horizon and evaluation on the intended population.
+Reopen this review if new primary-source evidence becomes available.
+
 ## Getting the raw file
 
 1. Download the CSV manually from the source page (sign in if requested).

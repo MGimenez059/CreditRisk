@@ -188,11 +188,12 @@ are skipped; unit tests still run. CI always sets it.
 ## Ethical considerations
 
 Educational/portfolio use only. No real lending decisions, automated loan approvals
-or claims about an individual's actual creditworthiness. The public dataset's
-population, collection process, default observation horizon and synthetic origin
-are not independently verified. Do not claim it represents real-world performance.
-Use synthetic API examples and no direct personal identifiers. Limitations and
-potential bias belong in the [model card](docs/model_card.md).
+or claims about an individual's actual creditworthiness. Dataset provenance and the
+default observation horizon have documented limitations; results apply to this
+dataset, with no claim of real-world or Argentine-population validation.
+See the [provenance review](docs/data_dictionary.md#provenance-review-and-scope) and
+[model card](docs/model_card.md) for details. API examples use synthetic inputs
+without direct personal identifiers.
 
 ## Documentation
 

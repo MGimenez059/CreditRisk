@@ -12,7 +12,11 @@ and [backend verification](docs/backend.md).
 - [x] Select Kaggle `laotse/credit-risk-dataset`.
 - [x] Document known provenance and unknowns in the data dictionary.
 - [x] Verify source version 1, CC0 license and target 0/1 mapping via Kaggle metadata.
-- [ ] Observation horizon and collection/timing remain undocumented upstream; retain as limitations.
+- [x] Record missing observation horizon and collection/timing as dataset limitations; see the [provenance review](docs/data_dictionary.md#provenance-review-and-scope).
+
+Planning is complete for the educational scope. The source metadata recorded in this
+repository does not establish these facts; closing the review does not verify them.
+Revisit provenance if new primary-source evidence becomes available.
 
 ## Phase 1 — Repository
 - [x] Python package, Ruff, MyPy, Pytest and pre-commit configuration.
